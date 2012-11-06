@@ -1,0 +1,4 @@
+version=3
+
+# <Webpage URL> <string match>
+https://github.com/simsong/bulk_extractor/downloads bulk_extractor-(.*)\.tar\.gz
