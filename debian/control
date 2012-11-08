@@ -2,7 +2,7 @@ Source: bulk-extractor
 Section: net
 Priority: extra
 Maintainer: dookie <dookie@kali.org>
-Build-Depends: debhelper (>= 8.0.0), autotools-dev
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, flex
 Standards-Version: 3.9.3
 Homepage: https://github.com/simsong/bulk_extractor
 Vcs-Git: ssh://git@git.kali.org/packages/bulk-extractor.git
