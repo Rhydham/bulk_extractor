@@ -10,7 +10,7 @@ Vcs-Browser: http://git.kali.org/gitweb/?p=packages/bulk-extractor.git;a=summary
 
 Package: bulk-extractor
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libafflib0, libewf1, libssl1.0.0, libexpat1, libexiv2-9, zlib1g
+Depends: ${shlibs:Depends}, ${misc:Depends}, libafflib0, libewf1, libssl1.0.0, libexpat1, libexiv2-12, zlib1g
 Description: Extracts information without parsing filesystem
  bulk_extractor is a C++ program that scans a disk image, a file,
  or a directory of files and extracts useful information without
