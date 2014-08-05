@@ -10,4 +10,11 @@
 #export DH_VERBOSE=1
 
 %:
-	dh $@  --with autotools-dev
+	dh $@  --with autoreconf
+
+#download required git submodules
+override_dh_autoreconf:
+	test -d src/be13_api/.git || git clone git://github.com/simsong/be13_api.git src/be13_api
+	test -d src/dfxml/.git || git clone git://github.com/simsong/dfxml.git src/dfxml
+	test -d src/sceadan/.git || git clone git://github.com/nbeebe/sceadan.git src/sceadan
+	dh_autoreconf
