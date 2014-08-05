@@ -8,6 +8,8 @@ import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
+import javax.swing.event.ListDataListener;
+import javax.swing.event.ListDataEvent;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.KeyStroke;
@@ -33,8 +35,7 @@ import java.net.URL;
 public class BEMenus extends JMenuBar {
 
   private final long serialVersionUID = 1;
-  private JCheckBoxMenuItem cbShowShortcutsToolbar;
-  private JCheckBoxMenuItem cbShowHighlightToolbar;
+  private JCheckBoxMenuItem cbShowToolbar;
   private JRadioButtonMenuItem rbFeatureText;
   private JRadioButtonMenuItem rbTypedText;
   private JRadioButtonMenuItem rbTextView;
@@ -45,15 +46,18 @@ public class BEMenus extends JMenuBar {
   private JRadioButtonMenuItem rbReferencedFeaturesCollapsible;
   private JCheckBoxMenuItem cbShowStoplistFiles;
   private JCheckBoxMenuItem cbShowEmptyFiles;
-  private JRadioButtonMenuItem rbImageReaderOptimal;
-  private JRadioButtonMenuItem rbImageReaderJavaOnly;
-  private JRadioButtonMenuItem rbImageReaderBulkExtractor;
-  private JRadioButtonMenuItem rbImageReaderLibewfcsTester;
   private JMenuItem miPrintFeature;
-  private JMenuItem miBookmark;
+  private JMenuItem miClearBookmarks;
+  private JMenuItem miExportBookmarks;
   private JMenuItem miCopy;
   private JMenuItem miClose;
   private JMenuItem miCloseAll;
+  private JMenuItem miAddBookmark;
+  private JMenuItem miManageBookmarks;
+  private JMenuItem miPanToStart;
+  private JMenuItem miPanToEnd;
+  private JMenuItem miShowReportFile;
+  private JMenuItem miShowLog;
 
   private final int KEY_MASK = Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
   private final KeyStroke KEYSTROKE_O = KeyStroke.getKeyStroke(KeyEvent.VK_O, KEY_MASK);
@@ -61,6 +65,9 @@ public class BEMenus extends JMenuBar {
   private final KeyStroke KEYSTROKE_C = KeyStroke.getKeyStroke(KeyEvent.VK_C, KEY_MASK);
   private final KeyStroke KEYSTROKE_R = KeyStroke.getKeyStroke(KeyEvent.VK_R, KEY_MASK);
   private final KeyStroke KEYSTROKE_A = KeyStroke.getKeyStroke(KeyEvent.VK_A, KEY_MASK);
+  private final KeyStroke KEYSTROKE_M = KeyStroke.getKeyStroke(KeyEvent.VK_M, KEY_MASK);
+  private final KeyStroke KEYSTROKE_B = KeyStroke.getKeyStroke(KeyEvent.VK_B, KEY_MASK);
+  private final KeyStroke KEYSTROKE_L = KeyStroke.getKeyStroke(KeyEvent.VK_L, KEY_MASK);
 
   // ********************************************************************************
   // Create the menus
@@ -151,20 +158,27 @@ public class BEMenus extends JMenuBar {
     file.addSeparator();
 
     // file|export bookmarks
-    miBookmark = new JMenuItem("Export Bookmarks\u2026", BEIcons.EXPORT_BOOKMARKS_16);	// ...
-    file.add(miBookmark);
-    miBookmark.addActionListener(new ActionListener() {
+    miExportBookmarks = new JMenuItem("Export Bookmarks\u2026", BEIcons.EXPORT_BOOKMARKS_16);	// ...
+    file.add(miExportBookmarks);
+    miExportBookmarks.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        WBookmarks.openWindow();
+        WManageBookmarks.saveBookmarks();
       }
     });
 
     // wire listener to manage when bookmarks are available for export
-    BEViewer.featureBookmarksModel.addBookmarksModelChangedListener(new Observer() {
-      public void update(Observable o, Object arg) {
-        miBookmark.setEnabled(BEViewer.featureBookmarksModel.size() > 0);
+    BEViewer.bookmarksModel.bookmarksComboBoxModel.addListDataListener(new ListDataListener() {
+      public void contentsChanged(ListDataEvent e) {
+        miExportBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+      public void intervalAdded(ListDataEvent e) {
+        miExportBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+      public void intervalRemoved(ListDataEvent e) {
+        miExportBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
       }
     });
+    miExportBookmarks.setEnabled(false);
 
     // file|<separator>
     file.addSeparator();
@@ -190,7 +204,7 @@ public class BEMenus extends JMenuBar {
     // file|<separator>
     file.addSeparator();
 
-    // file|Print Feature
+    // file|Print Range
     miPrintFeature = new JMenuItem("Print Range\u2026", BEIcons.PRINT_FEATURE_16);	// ...
     miPrintFeature.setEnabled(false);
     file.add(miPrintFeature);
@@ -246,12 +260,26 @@ public class BEMenus extends JMenuBar {
     // edit|<separator>
     edit.addSeparator();
 
-    // edit|clear navigation history
-    mi = new JMenuItem("Clear Navigation History");
-    edit.add(mi);
-    mi.addActionListener(new ActionListener() {
+    // edit|clear all bookmarks
+    miClearBookmarks = new JMenuItem("Clear Bookmarks");
+    edit.add(miClearBookmarks);
+    miClearBookmarks.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        BEViewer.featureNavigationComboBoxModel.removeAllFeatures();
+        BEViewer.bookmarksModel.clear();
+      }
+    });
+    miClearBookmarks.setEnabled(false);
+
+    // wire listener to know when bookmarks are empty
+    BEViewer.bookmarksModel.bookmarksComboBoxModel.addListDataListener(new ListDataListener() {
+      public void contentsChanged(ListDataEvent e) {
+        miClearBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+      public void intervalAdded(ListDataEvent e) {
+        miClearBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+      public void intervalRemoved(ListDataEvent e) {
+        miClearBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
       }
     });
 
@@ -259,43 +287,22 @@ public class BEMenus extends JMenuBar {
     JMenu view = new JMenu("View");
     add(view);
     ButtonGroup imageGroup = new ButtonGroup();
-    ButtonGroup addressBaseGroup = new ButtonGroup();
+    ButtonGroup forensicPathNumericBaseGroup = new ButtonGroup();
     ButtonGroup referencedFeaturesGroup = new ButtonGroup();
-    ButtonGroup imageReaderGroup = new ButtonGroup();
 
-    // view|Toolbars
-    JMenu toolbarMenu = new JMenu("Toolbars");
-    view.add(toolbarMenu);
-
-    // view|Toolbars|Shortcuts Toolbar
-    cbShowShortcutsToolbar = new JCheckBoxMenuItem("Shortcuts Toolbar");
-    cbShowShortcutsToolbar.setSelected(true);
-    toolbarMenu.add(cbShowShortcutsToolbar);
-    cbShowShortcutsToolbar.addActionListener(new ActionListener() {
+    // view|Toolbar
+    cbShowToolbar = new JCheckBoxMenuItem("Toolbar");
+    cbShowToolbar.setSelected(true);
+    view.add(cbShowToolbar);
+    cbShowToolbar.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        BEViewer.shortcutsToolbar.setVisible(cbShowShortcutsToolbar.isSelected());
+        BEViewer.toolbar.setVisible(cbShowToolbar.isSelected());
       }
     });
-    // wire listener to know when the shortcuts toolbar is visible
-    BEViewer.shortcutsToolbar.addShortcutsToolbarChangedListener(new Observer() {
+    // wire listener to know when the toolbar is visible
+    BEViewer.toolbar.addToolbarChangedListener(new Observer() {
       public void update(Observable o, Object arg) {
-        cbShowShortcutsToolbar.setSelected(BEViewer.shortcutsToolbar.isVisible());
-      }
-    });
-
-    // view|Toolbars|Highlight Toolbar
-    cbShowHighlightToolbar = new JCheckBoxMenuItem("Highlight Toolbar");
-    cbShowHighlightToolbar.setSelected(true);
-    toolbarMenu.add(cbShowHighlightToolbar);
-    cbShowHighlightToolbar.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        BEViewer.highlightToolbar.setVisible(cbShowHighlightToolbar.isSelected());
-      }
-    });
-    // wire listener to know when the highlight toolbar is visible
-    BEViewer.highlightToolbar.addHighlightToolbarChangedListener(new Observer() {
-      public void update(Observable o, Object arg) {
-        cbShowHighlightToolbar.setSelected(BEViewer.highlightToolbar.isVisible());
+        cbShowToolbar.setSelected(BEViewer.toolbar.isVisible());
       }
     });
 
@@ -326,7 +333,7 @@ public class BEMenus extends JMenuBar {
     // wire listener to manage which image view type button is selected
     BEViewer.imageView.addImageViewChangedListener(new Observer() {
       public void update(Observable o, Object arg) {
-        // this could be changed to act only on ImageView.ChangeType.ADDRESS_FORMAT_CHANGED
+        // this could be changed to act only on ImageView.ChangeType.FORENSIC_PATH_NUMERIC_BASE_CHANGED
         ImageLine.LineFormat lineFormat = BEViewer.imageView.getLineFormat();
         if (lineFormat == ImageLine.LineFormat.TEXT_FORMAT) {
           rbTextView.setSelected(true);
@@ -338,58 +345,57 @@ public class BEMenus extends JMenuBar {
       }
     });
     
-    // view|Address Base
-    JMenu addressBaseMenu = new JMenu("Address Base");
-    view.add(addressBaseMenu);
+    // view|Forensic Path Numeric Base
+    JMenu forensicPathNumericBaseMenu = new JMenu("Forensic Path Numeric Base");
+    view.add(forensicPathNumericBaseMenu);
 
-    // view|Address Base|Decimal
+    // view|Forensic Path Numeric Base|Decimal
     rbDecimal = new JRadioButtonMenuItem("Decimal");
-    addressBaseGroup.add(rbDecimal);
-    addressBaseMenu.add(rbDecimal);
+    forensicPathNumericBaseGroup.add(rbDecimal);
+    forensicPathNumericBaseMenu.add(rbDecimal);
     rbDecimal.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        BEViewer.featuresModel.setAddressFormat(BEPreferences.FEATURE_ADDRESS_FORMAT_DECIMAL);
-        BEViewer.referencedFeaturesModel.setAddressFormat(BEPreferences.FEATURE_ADDRESS_FORMAT_DECIMAL);
-        BEViewer.imageView.setAddressFormat(BEPreferences.IMAGE_ADDRESS_FORMAT_DECIMAL);
+        BEViewer.featuresModel.setUseHexPath(false);
+        BEViewer.referencedFeaturesModel.setUseHexPath(false);
+        BEViewer.imageView.setUseHexPath(false);
+        BEViewer.bookmarksModel.fireViewChanged();
       }
     });
 
-    // view|Address Base|Hex
+    // view|Forensic Path Numeric Base|Hex
     rbHex = new JRadioButtonMenuItem("Hexadecimal");
-    addressBaseGroup.add(rbHex);
-    addressBaseMenu.add(rbHex);
+    forensicPathNumericBaseGroup.add(rbHex);
+    forensicPathNumericBaseMenu.add(rbHex);
     rbHex.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        BEViewer.featuresModel.setAddressFormat(BEPreferences.FEATURE_ADDRESS_FORMAT_HEX);
-        BEViewer.referencedFeaturesModel.setAddressFormat(BEPreferences.FEATURE_ADDRESS_FORMAT_HEX);
-        BEViewer.imageView.setAddressFormat(BEPreferences.IMAGE_ADDRESS_FORMAT_HEX);
+        BEViewer.featuresModel.setUseHexPath(true);
+        BEViewer.referencedFeaturesModel.setUseHexPath(true);
+        BEViewer.imageView.setUseHexPath(true);
+        BEViewer.bookmarksModel.fireViewChanged();
       }
     });
     
-    // wire listener to manage which address base is shown in the menu
+    // wire listener to manage which forensic path numeric base is shown in the menu
     BEViewer.imageView.addImageViewChangedListener(new Observer() {
       public void update(Observable o, Object arg) {
-        if (BEViewer.imageView.getChangeType() == ImageView.ChangeType.ADDRESS_FORMAT_CHANGED) {
-          String addressFormat = BEViewer.imageView.getAddressFormat();
-          if (addressFormat.equals(BEPreferences.FEATURE_ADDRESS_FORMAT_DECIMAL)) {
+        if (BEViewer.imageView.getChangeType() == ImageView.ChangeType.FORENSIC_PATH_NUMERIC_BASE_CHANGED) {
+          boolean isHex = BEViewer.imageView.getUseHexPath();
+          if (!isHex) {
             rbDecimal.setSelected(true);
-          } else if (addressFormat.equals(BEPreferences.FEATURE_ADDRESS_FORMAT_HEX)) {
-            rbHex.setSelected(true);
           } else {
-            // preference value got corrupted, just warn.
-            WLog.log("BEMenus.addImageViewChangedListener: corrupted value: " + addressFormat);
+            rbHex.setSelected(true);
           }
         }
       }
     });
     
-    // view|Feature File Font
-    JMenu featureFileFontMenu = new JMenu("Feature File Font");
-    view.add(featureFileFontMenu);
+    // view|Feature Font Size
+    JMenu featureFontSizeMenu = new JMenu("Feature Font Size");
+    view.add(featureFontSizeMenu);
 
-    // view|Feature File Font|Zoom In
+    // view|Feature Font Size|Zoom In
     mi = new JMenuItem("Zoom In");
-    featureFileFontMenu.add(mi);
+    featureFontSizeMenu.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         BEViewer.featuresModel.setFontSize(BEViewer.featuresModel.getFontSize() + 1);
@@ -397,9 +403,9 @@ public class BEMenus extends JMenuBar {
       }
     });
 
-    // view|Feature File Font|Zoom Out
+    // view|Feature Font Size|Zoom Out
     mi = new JMenuItem("Zoom Out");
-    featureFileFontMenu.add(mi);
+    featureFontSizeMenu.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         int oldFontSize = BEViewer.featuresModel.getFontSize();
@@ -415,7 +421,7 @@ public class BEMenus extends JMenuBar {
 
     // view|Feature File View|Normal Size
     mi = new JMenuItem("Normal Size");
-    featureFileFontMenu.add(mi);
+    featureFontSizeMenu.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         BEViewer.featuresModel.setFontSize(BEPreferences.DEFAULT_FEATURE_FONT_SIZE);
@@ -423,22 +429,22 @@ public class BEMenus extends JMenuBar {
       }
     });
 
-    // view|Image File Font
-    JMenu imageFileFontMenu = new JMenu("Image File Font");
-    view.add(imageFileFontMenu);
+    // view|Image Font Size
+    JMenu imageFontSizeMenu = new JMenu("Image Font Size");
+    view.add(imageFontSizeMenu);
 
-    // view|Image File Font|Zoom In
+    // view|Image Font Size|Zoom In
     mi = new JMenuItem("Zoom In");
-    imageFileFontMenu.add(mi);
+    imageFontSizeMenu.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         BEViewer.imageView.setFontSize(BEViewer.imageView.getFontSize() + 1);
       }
     });
 
-    // view|Image File Font|Zoom Out
+    // view|Image Font Size|Zoom Out
     mi = new JMenuItem("Zoom Out");
-    imageFileFontMenu.add(mi);
+    imageFontSizeMenu.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         int oldFontSize = BEViewer.imageView.getFontSize();
@@ -446,14 +452,14 @@ public class BEMenus extends JMenuBar {
           BEViewer.imageView.setFontSize(oldFontSize - 1);
         } else {
           WError.showError("Already at minimum font size of " + oldFontSize + ".",
-                           "BEViewer Image File Font Size error", null);
+                           "BEViewer Image Font Size Size error", null);
         }
       }
     });
 
-    // view|Image File Font|Normal Size
+    // view|Image Font Size|Normal Size
     mi = new JMenuItem("Normal Size");
-    imageFileFontMenu.add(mi);
+    imageFontSizeMenu.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         BEViewer.imageView.setFontSize(BEPreferences.DEFAULT_IMAGE_FONT_SIZE);
@@ -563,41 +569,129 @@ public class BEMenus extends JMenuBar {
     // view|<separator>
     view.addSeparator();
 
-    // view|propertes
-    JMenu properties = new JMenu("Properties");
-    view.add(properties);
+    // view|Selected Feature
+    JMenu selectedFeature = new JMenu("Selected Feature");
+    view.add(selectedFeature);
 
-    // view|Properties|Image Metadata
-    mi = new JMenuItem("Image Metadata");
-    properties.add(mi);
-    mi.addActionListener(new ActionListener() {
+    // view|SelectedFeature|Pan to Start of Path
+    miPanToStart = new JMenuItem("Pan to Start of Path");
+    selectedFeature.add(miPanToStart);
+    miPanToStart.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        WInfo.showInfo("Image Metadata", BEViewer.imageModel.getImageMetadata());
+        // move to start of feature currently in the image model
+        BEViewer.imageModel.setImageSelection(ForensicPath.getAdjustedPath(
+                     BEViewer.imageView.getImagePage().pageForensicPath, 0));
       }
     });
+    miPanToStart.setEnabled(false);
 
-    // view|Properties|Report File
-    mi = new JMenuItem("Report File");
-    properties.add(mi);
-    mi.addActionListener(new ActionListener() {
+    // view|SelectedFeature|Pan to  End of Path
+    miPanToEnd = new JMenuItem("Pan to End of Path");
+    selectedFeature.add(miPanToEnd);
+    miPanToEnd.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        FeatureLine featureLine = BEViewer.imageModel.getFeatureLine();
-        if (featureLine == null) {
+        // move to end of feature currently in the image model
+        ImageModel.ImagePage imagePage = BEViewer.imageView.getImagePage();
+        String pageForensicPath = imagePage.pageForensicPath;
+        long imageSize = imagePage.imageSize;
+        long imageEndOffset = (imageSize > 0) ? imageSize - 1 : 0;
+        BEViewer.imageModel.setImageSelection(ForensicPath.getAdjustedPath(
+                     pageForensicPath, imageEndOffset));
+      }
+    });
+    miPanToEnd.setEnabled(false);
+
+    // view|Selected Feature|<separator>
+    selectedFeature.addSeparator();
+
+    // view|Selected Feature|report.xml File
+    miShowReportFile = new JMenuItem("Show report.xml File");
+    selectedFeature.add(miShowReportFile);
+    miShowReportFile.addActionListener(new ActionListener() {
+      public void actionPerformed (ActionEvent e) {
+        // get the currently selected feature line
+        FeatureLine featureLine = BEViewer.featureLineSelectionManager.getFeatureLineSelection();
+        if (featureLine.featuresFile == null) {
           WError.showError("A Feature must be selected before viewing the Report file.", 
-                           "BEViewer Properties error", null);
+                           "BEViewer Selected Feature error", null);
         } else {
           try {
-            File featureFile = BEViewer.imageModel.getFeatureLine().getFeaturesFile();
-            File reportFile = new File(featureFile.getParentFile(), "report.xml");
+            File reportFile = new File(featureLine.featuresFile.getParentFile(), "report.xml");
             URL url = reportFile.toURI().toURL();
             new WURL("Bulk Extractor Viewer Report file " + reportFile.toString(), url);
           } catch (Exception exc) {
-            WError.showError("Unable to read report properties.", 
+            WError.showError("Unable to read report.xml file.", 
                              "BEViewer Read error", exc);
           }
         }
       }
     });
+    miShowReportFile.setEnabled(false);
+
+    // wire action for all view|selected feature items
+    BEViewer.featureLineSelectionManager.addFeatureLineSelectionManagerChangedListener(new Observer() {
+      public void update(Observable o, Object arg) {
+        FeatureLine selectedFeatureLine = BEViewer.featureLineSelectionManager.getFeatureLineSelection();
+        boolean hasSelection = !selectedFeatureLine.isBlank();
+        miPanToStart.setEnabled(hasSelection);
+        miPanToEnd.setEnabled(hasSelection);
+        miShowReportFile.setEnabled(hasSelection);
+      }
+    });
+
+    // bookmarks
+    JMenu bookmarks = new JMenu("Bookmarks");
+    add(bookmarks);
+
+    // bookmarks|Bookmark selected Feature
+    miAddBookmark = new JMenuItem("Bookmark selected Feature", BEIcons.ADD_BOOKMARK_16);	// ...
+    bookmarks.add(miAddBookmark);
+    miAddBookmark.setAccelerator(KEYSTROKE_B);
+    miAddBookmark.addActionListener(new ActionListener() {
+      public void actionPerformed (ActionEvent e) {
+        FeatureLine selectedFeatureLine = BEViewer.featureLineSelectionManager.getFeatureLineSelection();
+        BEViewer.bookmarksModel.addElement(selectedFeatureLine);
+      }
+    });
+
+    // a feature line has been selected and may be added as a bookmark
+    BEViewer.featureLineSelectionManager.addFeatureLineSelectionManagerChangedListener(new Observer() {
+      public void update(Observable o, Object arg) {
+
+      // same as in BEToolbar
+
+      // enabled if feature line is not blank and is not already bookmarked
+      FeatureLine selectedFeatureLine = BEViewer.featureLineSelectionManager.getFeatureLineSelection();
+      miAddBookmark.setEnabled(!selectedFeatureLine.isBlank()
+                   && !BEViewer.bookmarksModel.contains(selectedFeatureLine));
+      }
+    });
+    FeatureLine selectedFeatureLine = BEViewer.featureLineSelectionManager.getFeatureLineSelection();
+    miAddBookmark.setEnabled(!selectedFeatureLine.isBlank()
+                   && !BEViewer.bookmarksModel.contains(selectedFeatureLine));
+
+    // bookmarks|Manage Bookmarks
+    miManageBookmarks = new JMenuItem("Manage Bookmarks\u2026", BEIcons.MANAGE_BOOKMARKS_16);	// ...
+    bookmarks.add(miManageBookmarks);
+    miManageBookmarks.setAccelerator(KEYSTROKE_M);
+    miManageBookmarks.addActionListener(new ActionListener() {
+      public void actionPerformed (ActionEvent e) {
+        WManageBookmarks.openWindow();
+      }
+    });
+    // wire listener to manage when bookmarks are available for management
+    BEViewer.bookmarksModel.bookmarksComboBoxModel.addListDataListener(new ListDataListener() {
+      public void contentsChanged(ListDataEvent e) {
+        miManageBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+      public void intervalAdded(ListDataEvent e) {
+        miManageBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+      public void intervalRemoved(ListDataEvent e) {
+        miManageBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
+      }
+    });
+    miManageBookmarks.setEnabled(!BEViewer.bookmarksModel.isEmpty());
 
     // tools
     JMenu tools = new JMenu("Tools");
@@ -609,7 +703,16 @@ public class BEMenus extends JMenuBar {
     mi.setAccelerator(KEYSTROKE_R);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        WScan.openWindow();
+        WScan.openWindow(new ScanSettings());
+      }
+    });
+
+    // tools|bulk_extractor Run Queue...
+    mi = new JMenuItem("bulk_extractor Run Queue\u2026");
+    tools.add(mi);
+    mi.addActionListener(new ActionListener() {
+      public void actionPerformed (ActionEvent e) {
+        WScanSettingsRunQueue.openWindow();
       }
     });
 
@@ -617,22 +720,8 @@ public class BEMenus extends JMenuBar {
     JMenu help = new JMenu("Help");
     add(help);
 
-//    // help|BEViewer Help
-//    mi = new JMenuItem("BEViewer Help", BEIcons.HELP_16);
-//    help.add(mi);
-//    mi.setAccelerator(KEYSTROKE_H);
-//    mi.addActionListener(new ActionListener() {
-//      public void actionPerformed (ActionEvent e) {
-//        if (Desktop.isDesktopSupported()) {
-//          try {
-//////        WHelp.openWindow();
-////        URL helpURL = this.getClass().getClassLoader().getResource("doc/help.html");
-////        new WURL("Bulk Extractor Viewer Help", helpURL);
-//      }
-//    });
-
     // help|About
-    mi = new JMenuItem("About BEViewer " + Config.VERSION, BEIcons.HELP_ABOUT_16);
+    mi = new JMenuItem("About Bulk Extractor Viewer " + Config.VERSION, BEIcons.HELP_ABOUT_16);
     help.add(mi);
     mi.setAccelerator(KEYSTROKE_A);
     mi.addActionListener(new ActionListener() {
@@ -653,31 +742,32 @@ public class BEMenus extends JMenuBar {
     // help|<separator>
     help.addSeparator();
 
-    // help|Log
-    JMenu log = new JMenu("Log");
-    help.add(log);
+    // help|diagnostics
+    JMenu diagnostics = new JMenu("Diagnostics");
+    help.add(diagnostics);
 
-    // help|log|Show Log
-    mi = new JMenuItem("Show Log");
-    log.add(mi);
-    mi.addActionListener(new ActionListener() {
+    // help|diagnostics|Show Log
+    miShowLog = new JMenuItem("Show Log");
+    diagnostics.add(miShowLog);
+    miShowLog.setAccelerator(KEYSTROKE_L);
+    miShowLog.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         WLog.setVisible();
       }
     });
 
-    // help|log|Clear Log
+    // help|diagnostics|Clear Log
     mi = new JMenuItem("Clear Log");
-    log.add(mi);
+    diagnostics.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         WLog.clearLog();
       }
     });
 
-    // help|log|Copy Log to System Clipboard
+    // help|diagnostics|Copy Log to System Clipboard
     mi = new JMenuItem("Copy Log to System Clipboard");
-    log.add(mi);
+    diagnostics.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         // clear the selection manager
@@ -692,96 +782,15 @@ public class BEMenus extends JMenuBar {
       }
     });
 
-    // help|diagnostics
-    JMenu diagnostics = new JMenu("Diagnostics");
-    help.add(diagnostics);
+    // help|diagnostics|<separator>
+    diagnostics.addSeparator();
 
-    // help|diagnostics|Image Reader
-    JMenu imageReaderMenu = new JMenu("Image Reader");
-    diagnostics.add(imageReaderMenu);
-
-    // help|diagnostics|Image Reader|OPTIMAL
-    rbImageReaderOptimal = new JRadioButtonMenuItem(ImageReaderType.OPTIMAL.toString());
-    imageReaderGroup.add(rbImageReaderOptimal);
-    imageReaderMenu.add(rbImageReaderOptimal);
-    rbImageReaderOptimal.setSelected(true);
-    rbImageReaderOptimal.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        BEViewer.imageModel.imageReaderManager.setReaderTypeAllowed(ImageReaderType.OPTIMAL);
-      }
-    });
-
-    // help|diagnostics|Image Reader|JAVA_ONLY
-    rbImageReaderJavaOnly = new JRadioButtonMenuItem(ImageReaderType.JAVA_ONLY.toString());
-    imageReaderGroup.add(rbImageReaderJavaOnly);
-    imageReaderMenu.add(rbImageReaderJavaOnly);
-    rbImageReaderJavaOnly.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        BEViewer.imageModel.imageReaderManager.setReaderTypeAllowed(ImageReaderType.JAVA_ONLY);
-      }
-    });
-
-    // help|diagnostics|Image Reader|BULK_EXTRACTOR
-    rbImageReaderBulkExtractor = new JRadioButtonMenuItem(ImageReaderType.BULK_EXTRACTOR.toString());
-    imageReaderGroup.add(rbImageReaderBulkExtractor);
-    imageReaderMenu.add(rbImageReaderBulkExtractor);
-    rbImageReaderBulkExtractor.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        BEViewer.imageModel.imageReaderManager.setReaderTypeAllowed(ImageReaderType.BULK_EXTRACTOR);
-      }
-    });
-
-    // help|diagnostics|Image Reader|LIBEWFCS_TESTER
-    rbImageReaderLibewfcsTester = new JRadioButtonMenuItem(ImageReaderType.LIBEWFCS_TESTER.toString());
-    imageReaderGroup.add(rbImageReaderLibewfcsTester);
-    imageReaderMenu.add(rbImageReaderLibewfcsTester);
-    rbImageReaderLibewfcsTester.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        BEViewer.imageModel.imageReaderManager.setReaderTypeAllowed(ImageReaderType.LIBEWFCS_TESTER);
-      }
-    });
-
-    // wire listener to manage which visibility mode is shown in the menu
-    BEViewer.imageModel.imageReaderManager.addImageReaderManagerChangedListener(new Observer() {
-      public void update(Observable o, Object arg) {
-
-        ImageReaderType imageReaderType = BEViewer.imageModel.imageReaderManager.getReaderTypeAllowed();
-//        BEViewer.imageModel.refresh();
-        if (imageReaderType == ImageReaderType.OPTIMAL) {
-          rbImageReaderOptimal.setSelected(true);
-        } else if (imageReaderType == ImageReaderType.JAVA_ONLY) {
-          rbImageReaderJavaOnly.setSelected(true);
-        } else if (imageReaderType == ImageReaderType.BULK_EXTRACTOR) {
-          rbImageReaderBulkExtractor.setSelected(true);
-        } else if (imageReaderType == ImageReaderType.LIBEWFCS_TESTER) {
-          rbImageReaderLibewfcsTester.setSelected(true);
-        } else {
-          throw new RuntimeException("Invalid state");
-        }
-      }
-    });
-    
     // help|diagnostics|Close all Image Readers
     mi = new JMenuItem("Close All Image Readers");
     diagnostics.add(mi);
     mi.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         BEViewer.imageModel.closeAllImageReaders();
-      }
-    });
-
-    // help|diagnostics|Image End Page
-    mi = new JMenuItem("Show Image End Page");
-    diagnostics.add(mi);
-    mi.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        // move to end of feature currently in the image model
-        long imageSize = BEViewer.imageModel.getImageSize();
-        // identify the end page address
-        long imageEndAddress = (imageSize > 0) ? imageSize - 1 : 0;
-        long endPageAddress = ImageModel.getAlignedAddress(imageEndAddress);
-
-        BEViewer.imageModel.setPageStartAddress(endPageAddress);
       }
     });
 

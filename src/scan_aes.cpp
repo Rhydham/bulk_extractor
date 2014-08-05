@@ -29,7 +29,8 @@
  */
  
 
-#include "bulk_extractor.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
 
 
 
@@ -215,18 +216,11 @@ void sbox_setup()
 // but it should be recoded with a rotate left instruction
 inline void rotate(unsigned char *in) 
 {
-#ifdef OLD_IMPLEMENTATION
-    u_char a = in[0];
-    for(u_char c = 0; c < 3; c++) {
-	in[c] = in[c + 1];
-    }
-    in[3] = a;
-#else
-    uint32_t reg = *(uint32_t *)in;
-    reg = (reg>>8) | (reg<<24);
-    *(uint32_t *)in = reg;
-#endif    
-    return;
+    unsigned char in0 = in[0];
+    in[0] = in[1];
+    in[1] = in[2];
+    in[2] = in[3];
+    in[3] = in0;
 }
 
 // This is the core key expansion, which, given a 4-byte value,
@@ -380,9 +374,9 @@ int valid_aes256_schedule(const unsigned char * in)
 
 
 
-static string key_to_string(const unsigned char * key, uint64_t sz)
+static std::string key_to_string(const unsigned char * key, uint64_t sz)
 {
-    string ret;
+    std::string ret;
     for(size_t pos=0;pos<sz;pos++){
 	char buf[4];
 	snprintf(buf,sizeof(buf),"%02x ", key[pos]);
@@ -398,7 +392,7 @@ extern "C"
 void scan_aes(const class scanner_params &sp,const recursion_control_block &rcb)
 {
     assert(sp.sp_version==scanner_params::CURRENT_SP_VERSION);
-    if(sp.phase==scanner_params::startup){
+    if(sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
 	sp.info->name		= "aes";
 	sp.info->author		= "Sam Trenholme, Jesse Kornblum and Simson Garfinkel";
@@ -414,7 +408,7 @@ void scan_aes(const class scanner_params &sp,const recursion_control_block &rcb)
     /* We don't need to check for phase 2 of if sbuf isn't big enough to hold a KEY_SCHEDULE
      */
 
-    if(sp.phase==scanner_params::scan && sp.sbuf.bufsize >= WINDOW_SIZE){
+    if(sp.phase==scanner_params::PHASE_SCAN && sp.sbuf.bufsize >= WINDOW_SIZE){
 	feature_recorder *aes_recorder = sp.fs.get_name("aes_keys");
 
 	/* Simple mod: Keep a rolling window of the entropy and don't
@@ -451,16 +445,16 @@ void scan_aes(const class scanner_params &sp,const recursion_control_block &rcb)
 	    if(distinct_counts>10){
 		const u_char *p2 = sp.sbuf.buf + pos;
 		if (valid_aes128_schedule(p2)) {
-		    string key = key_to_string(p2, AES128_KEY_SIZE);
-		    aes_recorder->write(sp.sbuf.pos0+pos,key,string("AES128"));
+                    std::string key = key_to_string(p2, AES128_KEY_SIZE);
+		    aes_recorder->write(sp.sbuf.pos0+pos,key,std::string("AES128"));
 		}
 		if (valid_aes192_schedule(p2)) {
-		    string key = key_to_string(p2, AES192_KEY_SIZE);
-		    aes_recorder->write(sp.sbuf.pos0+pos,key,string("AES192"));
+                    std::string key = key_to_string(p2, AES192_KEY_SIZE);
+		    aes_recorder->write(sp.sbuf.pos0+pos,key,std::string("AES192"));
 		}
 		if (valid_aes256_schedule(p2)) {
-		    string key = key_to_string(p2, AES256_KEY_SIZE);
-		    aes_recorder->write(sp.sbuf.pos0+pos,key,string("AES256"));
+                    std::string key = key_to_string(p2, AES256_KEY_SIZE);
+		    aes_recorder->write(sp.sbuf.pos0+pos,key,std::string("AES256"));
 		}
 	    }
 	    /* remove current byte being analyzed */

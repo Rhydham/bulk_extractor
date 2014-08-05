@@ -51,9 +51,7 @@ public class ImageRangePrinter implements Printable {
 
     // validate that the image page is printable
     imagePage = imageView.getImagePage();
-    if (imagePage == null || imagePage.featureLine == null
-    || imagePage.featureLine.getImageFile() == null
-    || imagePage.featureLine.getFeaturesFile() == null) {
+    if (imagePage.featureLine.actualImageFile == null || imagePage.featureLine.featuresFile == null) {
       WError.showError("Invalid Image content", "Print Error", null);
       return NO_SUCH_PAGE;
     }
@@ -146,17 +144,14 @@ public class ImageRangePrinter implements Printable {
     g.setFont(textFont);
 
     // get header information
-    FeatureLine featureLine = imagePage.featureLine;
-    String imageFile = FileTools.getAbsolutePath(featureLine.getImageFile());
-    String featureFile = featureLine.getFeaturesFile().getAbsolutePath();
-    String feature = featureLine.getFormattedFeatureText();
-    String featurePath = featureLine.getFormattedFirstField(imageView.getAddressFormat());
-  
+    String actualImageFile = FileTools.getAbsolutePath(imagePage.featureLine.actualImageFile);
+    String featuresFile = imagePage.featureLine.featuresFile.getAbsolutePath();
+    String forensicPath = ForensicPath.getPrintablePath(imagePage.featureLine.forensicPath, imageView.getUseHexPath());
+
     // paint header information
-    paintPair("Image File", imageFile);
-    paintPair("Feature File", featureFile);
-    paintPair("Feature Path", featurePath);
-    paintPair("Feature", feature);
+    paintPair("Image File", actualImageFile);
+    paintPair("Feature File", featuresFile);
+    paintPair("Forensic Path", forensicPath);
 
     // allow a space between header fields and image lines
     y += fontHeight;

@@ -14,9 +14,9 @@ public class FeatureBookmarksModel {
 //  private DefaultListModel<FeatureLine> defaultListModel = new DefaultListModel<FeatureLine>();
   private DefaultListModel defaultListModel = new DefaultListModel();
 
-  /*
+  /**
    * Returns the <code>DefaultListModel</code> associated with this model
-   * @return the bookmark list
+   * @return the bookmark list model
    */
 //  public DefaultListModel<FeatureLine> getListModel() {
   public DefaultListModel getListModel() {
@@ -55,10 +55,7 @@ public class FeatureBookmarksModel {
    * Removes a FeatureLine from the bookmarks list.
    */
   public void removeBookmark(FeatureLine featureLine) {
-    // remove the feature line if it is not already there
-    if (featureLine != null && !defaultListModel.contains(featureLine)) {
-      throw new IllegalArgumentException("Invalid request");
-    }
+    // remove the feature line
     defaultListModel.removeElement(featureLine);
     bookmarksModelChangedNotifier.fireModelChanged(null);
   }
@@ -106,9 +103,6 @@ public class FeatureBookmarksModel {
    * Clear the bookmarks of features associated with the given Report.
    */
   public void removeAssociatedBookmarks(ReportsModel.ReportTreeNode reportTreeNode) {
-    File imageFile = reportTreeNode.imageFile;
-    File featuresDirectory = reportTreeNode.featuresDirectory;
-    
     // DefaultComboBoxModel doesn't provide an iterator so copy to an array and use the array
     FeatureLine[] featureLines = new FeatureLine[size()];
     for (int i=0; i<featureLines.length; i++) {

@@ -1,9 +1,5 @@
 import java.awt.*;
 import javax.swing.*;
-import org.apache.log4j.Logger;
-import org.apache.log4j.AppenderSkeleton;
-import org.apache.log4j.spi.LoggingEvent;
-import org.apache.log4j.Level;
 
 /**
  * A pop-up window for displaying diagnostics log information.
@@ -15,13 +11,6 @@ public class WLog implements Thread.UncaughtExceptionHandler {
   private static JDialog window;
   private static JTextArea textArea;
 
-  // load logger
-  private static final Logger logger = Logger.getLogger("edu.nps.jlibewf");
-  static {
-    // enable all logging
-    logger.setLevel(Level.ALL);
-  }
-
   private WLog() {
   }
 
@@ -30,38 +19,6 @@ public class WLog implements Thread.UncaughtExceptionHandler {
    */
   public static void setExceptionHandling() {
     Thread.setDefaultUncaughtExceptionHandler(wLog);
-  }
-
-  /**
-   * Sets this object to intercept uncaught exceptions so that they may be reported.
-   */
-  public static void setLoggerAppender() {
-    logger.addAppender(new WLog.WLogAppender());
-  }
-
-  /**
-   * This class accepts log events from org.apache.log4j.Logger and logs them using WLog.
-   */
-  private static class WLogAppender extends AppenderSkeleton {
-    /**
-     * Forwards the log from Logger to WLog.
-     * @param e the log event to log
-     */
-    public void append(LoggingEvent e) {
-      log(e.getRenderedMessage());
-    }
-    /**
-     * Returns false indicating that no layout format is used.
-     */
-    public boolean requiresLayout() {
-      return false;
-    }
-    /**
-     * This <code>close</code> function is not supported.
-     */
-    public void close() {
-      WLog.log("WLog.WLogAppender.close not supported.");
-    }
   }
 
   /**
@@ -86,34 +43,6 @@ public class WLog implements Thread.UncaughtExceptionHandler {
         textArea.setText(textBuffer.toString());
       }
     });
-  }
-
-  /**
-   * Appends the text and long, typically an address, to the log record.
-   * If the log window is open, the view is updated to include the appended text.
-   * @param text the text to be appended to the log record
-   * @param l the <code>long</code> value, typically an address, associated with the text
-   */
-  public static void logLong(String text, long l) {
-    StringBuffer buffer = new StringBuffer();
-    buffer.append(text);
-    buffer.append(": ");
-    buffer.append(String.format(BEViewer.LONG_FORMAT, l));
-
-    // generate log string
-    String logString = buffer.toString();
-
-    // send to textBuffer
-    textBuffer.append(logString);
-    textBuffer.append("\n");
-
-    // send to stdout
-    System.out.println(logString);
-
-    // if the window is showing then update the view
-    if (window != null && window.isVisible()) {
-      setLogText();
-    }
   }
 
   /**
@@ -240,7 +169,7 @@ public class WLog implements Thread.UncaughtExceptionHandler {
         // create the JDialog window if it does not exist yet
         if (window == null) {
           // create the window component
-          window = new JDialog((Frame)null, "Bulk Extractor Viewer Runtime Log Report", false);
+          window = new JDialog((Frame)null, "Bulk Extractor Viewer Log", false);
           Container pane = window.getContentPane();
 
           // use GridBagLayout with GridBagConstraints

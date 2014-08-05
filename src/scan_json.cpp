@@ -28,7 +28,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "bulk_extractor.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -433,7 +434,7 @@ extern "C"
 void scan_json(const class scanner_params &sp,const recursion_control_block &rcb)
 {
     assert(sp.sp_version==scanner_params::CURRENT_SP_VERSION);
-    if(sp.phase==scanner_params::startup){
+    if(sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
 	sp.info->name		= "json";
         sp.info->author         = "Simson Garfinkel";
@@ -448,10 +449,16 @@ void scan_json(const class scanner_params &sp,const recursion_control_block &rcb
 	}
 	return; 
     }
-    if(sp.phase==scanner_params::shutdown) return;
-    if(sp.phase==scanner_params::scan){
-	const sbuf_t &sbuf = sp.sbuf;
-	feature_recorder *fr = sp.fs.get_name("json");
+    const sbuf_t &sbuf = sp.sbuf;
+    feature_recorder *fr = sp.fs.get_name("json");
+
+    if(sp.phase==scanner_params::PHASE_INIT){
+        fr->set_flag(feature_recorder::FLAG_XML);
+        return;
+    }
+
+    if(sp.phase==scanner_params::PHASE_SHUTDOWN) return;
+    if(sp.phase==scanner_params::PHASE_SCAN){
 
 	for(size_t pos = 0;pos+1<sbuf.pagesize;pos++){
 	    /* Find the beginning of a json object. This will improve later... */
@@ -466,7 +473,8 @@ void scan_json(const class scanner_params &sp,const recursion_control_block &rcb
 			// Only write JSON objects with more than 2 commas
 			if(jc.comma_count > 2 ){
 			    sbuf_t json(sbuf,pos,i-pos+1);
-			    fr->write(sbuf.pos0+i,json.asString(),json.md5().hexdigest());
+                            std::string json_hash = (*fr->fs.hasher.func)(json.buf,json.bufsize);
+			    fr->write(sbuf.pos0+i,json.asString(),json_hash);;
 			}
 			pos = i;		// skip to the end
 			break;

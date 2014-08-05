@@ -25,8 +25,8 @@
 
 # These will be displayed by the "Click here for support information" link in "Add/Remove Programs"
 # It is possible to use "mailto:" links here to open the email client
-!define HELPURL "//https://github.com/simsong/bulk_extractor" # "Support Information" link
-!define UPDATEURL "//https://github.com/simsong/bulk_extractor" # "Product Updates" link
+!define HELPURL "https://github.com/simsong/bulk_extractor" # "Support Information" link
+!define UPDATEURL "https://github.com/simsong/bulk_extractor" # "Product Updates" link
 !define ABOUTURL "https://github.com/simsong/bulk_extractor" # "Publisher" link
 
 !ifdef SIGN
@@ -35,11 +35,11 @@
 	!define BE_VIEWER_LAUNCHER "signed_BEViewerLauncher.exe"
 	!define UNINSTALLER_EXE "signed_uninstall.exe"
 !else
-	!define BULK_EXTRACTOR_32 "../win32/src/bulk_extractor32.exe"
-	!define BULK_EXTRACTOR_64 "../win64/src/bulk_extractor64.exe"
+	!define BULK_EXTRACTOR_32 "bulk_extractor32.exe"
+	!define BULK_EXTRACTOR_64 "bulk_extractor64.exe"
 	!define BE_VIEWER_LAUNCHER "BEViewerLauncher.exe"
 !endif
-!define BE_VIEWER_JAR "../java_gui/BEViewer.jar"
+!define BE_VIEWER_JAR "BEViewer.jar"
 
 SetCompressor lzma
  
@@ -49,12 +49,14 @@ InstallDir "$PROGRAMFILES\${APPNAME}"
  
 Name "${APPNAME}"
 !ifdef SIGN
-	outFile "be_installer-${VERSION}_intermediate.exe"
+	outFile "bulk_extractor-${VERSION}-intermediate.exe"
 !else
-	outFile "be_installer-${VERSION}_unsigned.exe"
+	outFile "bulk_extractor-${VERSION}-windowsinstaller.exe"
 !endif
  
 !include LogicLib.nsh
+!include EnvVarUpdate.nsi
+!include x64.nsh
  
 page components
 Page instfiles
@@ -79,15 +81,15 @@ function InstallOnce
 	file ${BE_VIEWER_JAR}
 
 	# install Registry information
-	WriteRegStr HKLM "${REG_SUB_KEY}" "DisplayName" "${APPNAME} - ${DESCRIPTION}"
-	WriteRegStr HKLM "${REG_SUB_KEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
-	WriteRegStr HKLM "${REG_SUB_KEY}" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
-	WriteRegStr HKLM "${REG_SUB_KEY}" "InstallLocation" "$\"$INSTDIR$\""
-	WriteRegStr HKLM "${REG_SUB_KEY}" "Publisher" "$\"${COMPANYNAME}$\""
-	WriteRegStr HKLM "${REG_SUB_KEY}" "HelpLink" "$\"${HELPURL}$\""
-	WriteRegStr HKLM "${REG_SUB_KEY}" "URLUpdateInfo" "$\"${UPDATEURL}$\""
-	WriteRegStr HKLM "${REG_SUB_KEY}" "URLInfoAbout" "$\"${ABOUTURL}$\""
-	WriteRegStr HKLM "${REG_SUB_KEY}" "DisplayVersion" "$\"${VERSION}$\""
+	WriteRegStr HKLM "${REG_SUB_KEY}" "DisplayName" "${APPNAME}"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "UninstallString" "$INSTDIR\uninstall.exe"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "QuietUninstallString" "$INSTDIR\uninstall.exe /S"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "InstallLocation" "$INSTDIR"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "Publisher" "${COMPANYNAME}"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "HelpLink" "${HELPURL}"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "URLUpdateInfo" "${UPDATEURL}"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "URLInfoAbout" "${ABOUTURL}"
+	WriteRegStr HKLM "${REG_SUB_KEY}" "DisplayVersion" "${VERSION}"
 	# There is no option for modifying or repairing the install
 	WriteRegDWORD HKLM "${REG_SUB_KEY}" "NoModify" 1
 	WriteRegDWORD HKLM "${REG_SUB_KEY}" "NoRepair" 1
@@ -109,16 +111,35 @@ function InstallOnce
 	# link the uninstaller to the start menu
 	createShortCut "$SMPROGRAMS\${APPNAME}\Uninstall ${APPNAME}.lnk" "$INSTDIR\uninstall.exe"
 
+        # install Python scripts
+        setOutPath "$INSTDIR\python"
+        file "../python/bulk_diff.py"
+        file "../python/bulk_extractor_reader.py"
+        file "../python/cda_tool.py"
+        file "../python/dfxml.py"
+        file "../python/fiwalk.py"
+        file "../python/identify_filenames.py"
+        file "../python/post_process_exif.py"
+        file "../python/report_encodings.py"
+        file "../python/statbag.py"
+        file "../python/ttable.py"
+
+        # install PDF docs
+        setOutPath "$INSTDIR\pdf"
+        file "BEProgrammersManual.pdf"
+        file "BEUsersManual.pdf"
+        file "BEWorkedExamplesStandalone.pdf"
+
+        # 
+	createShortCut "$SMPROGRAMS\${APPNAME}\Users Manual.lnk" "$INSTDIR\pdf\BEUsersManual.pdf"
+	createShortCut "$SMPROGRAMS\${APPNAME}\Programmers Manual.lnk" "$INSTDIR\pdf\BEProgrammersManual.pdf"
+	createShortCut "$SMPROGRAMS\${APPNAME}\Worked Examples.lnk" "$INSTDIR\pdf\BEWorkedExamplesStandalone.pdf"
+
 	AlreadyThere:
 functionEnd
 
-function .onInit
-	setShellVarContext all
-	!insertmacro VerifyUserIsAdmin
-functionEnd
+Section "32-bit configuration" SEC0000
 
-Section "32-bit configuration"
- 
 	# install content common to both
 	call InstallOnce
 
@@ -131,10 +152,10 @@ Section "32-bit configuration"
 	createShortCut "BEViewer.jar" "..\BEViewer.jar"
  
 	# create the shortcut link to the target's start menu
-	createShortCut "$SMPROGRAMS\${APPNAME}\${APPNAME} (32-bit).lnk" "$OUTDIR\BEViewerLauncher.exe"
+	createShortCut "$SMPROGRAMS\${APPNAME}\BEViewer with ${APPNAME} (32-bit).lnk" "$OUTDIR\BEViewerLauncher.exe"
 sectionEnd
 
-Section "64-bit configuration"
+Section "64-bit configuration" SEC0001
 
 	# install content common to both
 	call InstallOnce
@@ -148,8 +169,32 @@ Section "64-bit configuration"
 	createShortCut "BEViewer.jar" "..\BEViewer.jar"
  
 	# create the shortcut link to the target's start menu
-	createShortCut "$SMPROGRAMS\${APPNAME}\${APPNAME} (64-bit).lnk" "$OUTDIR\BEViewerLauncher.exe"
+	createShortCut "$SMPROGRAMS\${APPNAME}\BEViewer with ${APPNAME} (64-bit).lnk" "$OUTDIR\BEViewerLauncher.exe"
 sectionEnd
+
+Section "Add to path" SEC0002
+	setOutPath "$INSTDIR"
+        # note that path includes 32-bit and 64-bit, whether or not they
+        # were both installed
+        ${EnvVarUpdate} $0 "PATH" "A" "HKLM" "$INSTDIR\python"
+        ${EnvVarUpdate} $0 "PATH" "A" "HKLM" "$INSTDIR\32-bit"
+        ${EnvVarUpdate} $0 "PATH" "A" "HKLM" "$INSTDIR\64-bit"
+sectionEnd
+
+function .onInit
+        #Determine the bitness of the OS and enable the correct section
+        ${If} ${RunningX64}
+            SectionSetFlags ${SEC0000}  0
+            SectionSetFlags ${SEC0001}  ${SF_SELECTED}
+        ${Else}
+            SectionSetFlags ${SEC0001}  0
+            SectionSetFlags ${SEC0000}  ${SF_SELECTED}
+        ${EndIf}
+
+        # require admin
+	setShellVarContext all
+	!insertmacro VerifyUserIsAdmin
+functionEnd
 
 !ifndef SIGN
 function un.onInit
@@ -168,11 +213,11 @@ Function un.FailableDelete
 	IfFileExists "$0" FileStillPresent Continue
 
 	FileStillPresent:
-	DetailPrint "Unable to delete file $0, likely because it is in use.  Please close ${APPNAME} and try again."
+	DetailPrint "Unable to delete file $0, likely because it is in use.  Please close all Bulk Extractor files and try again."
 	MessageBox MB_ICONQUESTION|MB_RETRYCANCEL \
 		"Unable to delete file $0, \
-		likely because ${APPNAME} is in use.  \
-		Please close ${APPNAME} and try again." \
+		likely because it is in use.  \
+		Please close all Bulk Extractor files and try again." \
  		/SD IDABORT IDRETRY Start IDABORT InstDirAbort
 
 	# abort
@@ -196,19 +241,32 @@ section "uninstall"
 	Call un.FailableDelete
 	StrCpy $0 "$INSTDIR\64-bit\bulk_extractor.exe"
 	Call un.FailableDelete
+	StrCpy $0 "$INSTDIR\pdf\BEProgrammersManual.pdf"
+	Call un.FailableDelete
+	StrCpy $0 "$INSTDIR\pdf\BEUsersManual.pdf"
+	Call un.FailableDelete
+	StrCpy $0 "$INSTDIR\pdf\BEWorkedExamplesStandalone.pdf"
+	Call un.FailableDelete
 
-	# uninstall DLLs and links
+	# uninstall files and links
 	delete "$INSTDIR\32-bit\*"
 	delete "$INSTDIR\64-bit\*"
+	delete "$INSTDIR\python\*"
+	delete "$INSTDIR\pdf\*"
 
 	# uninstall dir
 	rmdir "$INSTDIR\32-bit"
 	rmdir "$INSTDIR\64-bit"
+	rmdir "$INSTDIR\python"
+	rmdir "$INSTDIR\pdf"
 
 	# uninstall Start Menu launcher shortcuts
-	delete "$SMPROGRAMS\${APPNAME}\${APPNAME} (32-bit).lnk"
-	delete "$SMPROGRAMS\${APPNAME}\${APPNAME} (64-bit).lnk"
+	delete "$SMPROGRAMS\${APPNAME}\BEViewer with ${APPNAME} (32-bit).lnk"
+	delete "$SMPROGRAMS\${APPNAME}\BEViewer with ${APPNAME} (64-bit).lnk"
 	delete "$SMPROGRAMS\${APPNAME}\uninstall ${APPNAME}.lnk"
+	delete "$SMPROGRAMS\${APPNAME}\Users Manual.lnk"
+	delete "$SMPROGRAMS\${APPNAME}\Programmers Manual.lnk"
+	delete "$SMPROGRAMS\${APPNAME}\Worked Examples.lnk"
 	rmDir "$SMPROGRAMS\${APPNAME}"
 
 	# delete the uninstaller
@@ -219,6 +277,12 @@ section "uninstall"
  
 	# Remove uninstaller information from the registry
 	DeleteRegKey HKLM "${REG_SUB_KEY}"
+
+        # remove associated search paths from the PATH environment variable
+        # were both installed
+        ${un.EnvVarUpdate} $0 "PATH" "R" "HKLM" "$INSTDIR\python"
+        ${un.EnvVarUpdate} $0 "PATH" "R" "HKLM" "$INSTDIR\32-bit"
+        ${un.EnvVarUpdate} $0 "PATH" "R" "HKLM" "$INSTDIR\64-bit"
 sectionEnd
 !endif
 

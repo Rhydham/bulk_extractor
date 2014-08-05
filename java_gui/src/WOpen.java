@@ -224,7 +224,7 @@ public class WOpen extends JDialog {
       setReportFile(reportFile);
       File defaultImageFile = readDefaultImageFile(reportFile);
       setDefaultImageFile(defaultImageFile);
-      setCustomImageFile(reportTreeNode.imageFile);
+      setCustomImageFile(reportTreeNode.reportImageFile);
     } else {
       // leave blank default
       setReportFile(null);
@@ -594,10 +594,10 @@ public class WOpen extends JDialog {
         }
 
         // validate the image file
+        // NOTE: a directory is valid because it indicates the absolute
+        // path to recursive files
         if (imagePathPreference != ImagePathPreference.NONE) {
-          if (imageFile.isDirectory()) {
-            errorString = "Directory " + imageFile.getPath() + "\nis not a valid Image file.";
-          } else if (!imageFile.canRead() && !imageFile.isAbsolute()) {
+          if (!imageFile.canRead() && !imageFile.isAbsolute()) {
             errorString = "Image file \"" + imageFile.getPath() + "\"\ncannot be read, likely because it is defined with a relative path."
                 +"\nPlease click on \"Select custom path\" to select or type in an absolute path.";
           } else if (!imageFile.canRead()) {

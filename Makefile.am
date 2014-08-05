@@ -1,156 +1,146 @@
+# bulk_extractor Makefile.am
+# This file is compiled with automake to create Makefile.in. 
+# Makefile.in is transformed by "configure" to create Makefile
+#
+
+# Bring in the defines from src_win (mostly SRC_WIN_DIST)
+SRC_WIN=src_win/
+include src_win/Makefile
+
+
+# These two conditionals are set by configure. If they, 
+# they cause a "make" in the top-level to automatically run make in the subdirs
 if WANT_BE_VIEWER
 BE_VIEWER_DIR = java_gui
 endif
-if WANT_WIN_INSTALLER
-SRC_WIN_DIR = src_win
-endif
 
-SUBDIRS = doc doc/user_manual src man python specfiles tests $(BE_VIEWER_DIR) $(SRC_WIN_DIR)
+## Note: to build the windows installer you must go into the directory,
+## since it is not using automake
+## if WANT_WIN_INSTALLER
+## SRC_WIN_DIR=src_win
+## endif
 
-EXTRA_DIST = bootstrap.sh \
-	ROADMAP.txt \
-	README_DFRWS_2012_CHALLENGE.txt \
-	m4/ax_pthread.m4
+SUBDIRS = doc doc/latex_manuals src man plugins python specfiles tests $(BE_VIEWER_DIR) 
 
-ACLOCAL_AMFLAGS="-I m4"
+# don't include bootstrap. People run it, and they shoudln't
+# It's only for people who check out the git repo
 
-RELEASE_USER = simsong@
-RELEASE_HOST = www.digitalcorpora.org
-RELEASE_DIR  = digitalcorpora.org/
+EXTRA_DIST = \
+	m4/ac_check_classpath.m4 \
+	m4/ac_check_junit.m4 \
+	m4/ac_check_rqrd_class.m4 \
+	m4/ac_java_options.m4 \
+	m4/ac_prog_jar.m4 \
+	m4/ac_prog_java.m4 \
+	m4/ac_prog_java_cc.m4 \
+	m4/ac_prog_java_works.m4 \
+	m4/ac_prog_javac.m4 \
+	m4/ac_prog_javac_works.m4 \
+	m4/ac_prog_javadoc.m4 \
+	m4/ac_prog_javah.m4 \
+	m4/ac_try_compile_java.m4 \
+	m4/ac_try_run_javac.m4 \
+	m4/ax_boost_base.m4 \
+	m4/ax_boost_filesystem.m4 \
+	m4/ax_boost_system.m4 \
+	m4/ax_pthread.m4 \
+	bootstrap.sh \
+	$(SRC_WIN_DIST)
 
-RELEASE_LOC  = $(RELEASE_DIR)/downloads/
-VERSION_FN   = $(PACKAGE)_version.txt
-RELEASE_PATH = $(RELEASE_LOC)/$(VERSION_FN)
-RELEASE_SSH  = $(RELEASE_USER)$(RELEASE_HOST):$(RELEASE_LOC)
-RELEASE	     = $(PACKAGE)-$(VERSION)
+ACLOCAL_AMFLAGS = -I m4
 
-AM_CFLAGS   = -Wall
-AM_CPPFLAGS = -Wall 
-AM_CXXFLAGS = -Wall
+.PHONY: exels
+exels:
+	/bin/ls -l */*exe
 
-release:
-	make check_release_version
-	make dist
-	make distcheck
-	make the_release
+.PHONY: execlean
+execlean:
+	/bin/rm -f */*exe
 
-check_release_version:
-	@echo Checking version on server for $(VERSION_FN)
-	@echo
-	echo
-	/bin/rm -f $(VERSION_FN)
-	wget -q http://$(RELEASE_HOST)/downloads/$(VERSION_FN)
-	@echo Version `cat $(VERSION_FN)` is on the server.
-	@sh -c "if [ `cat $(VERSION_FN)` = $(RELEASE).tar.gz ]; then echo ; echo ; echo $(RELEASE) is already on the server; exit 1; fi"
-	/bin/rm -f $(VERSION_FN)
+.PHONY: win32
+win32: win32/bulk_extractor32.exe
 
-the_release: 
-	gpg --detach-sign $(RELEASE).tar.gz
-	scp $(RELEASE).tar.gz{,.sig} $(RELEASE_SSH)
-	ssh $(RELEASE_HOST) 'cd $(RELEASE_LOC);/bin/rm $(PACKAGE).tar.gz;ln -s $(RELEASE).tar.gz $(PACKAGE).tar.gz'
-	ssh $(RELEASE_HOST) 'echo $(RELEASE).tar.gz > $(RELEASE_PATH)'
-	@echo Release $(RELEASE) uploaded to server
+.PHONY: win64
+win64: win64/bulk_extractor64.exe
 
-# config.h doesn't work right with .flex so run configure before make for win32 and win64
-win32:
-	rm -rf win32
+win32/bulk_extractor32.exe:
+	@echo '****************************************************'
+	@echo '*** making win32 with mingw32-configure and make ***'
+	@echo '****************************************************'
+	if [ -r Makefile ]; then $(MAKE) distclean ; fi
+	if [ ! -d win32  ]; then mkdir win32 ; fi
+	if [ ! -r win32/Makefile ]; then (cd win32;mingw32-configure) ; fi
+	(cd win32;$(MAKE))
+	(cp win32/src/bulk_extractor.exe win32/bulk_extractor32.exe)
+	ls -l win32/bulk_extractor32.exe
+
+win64/bulk_extractor64.exe:
+	@echo '****************************************************'
+	@echo '*** making win64 with mingw32-configure and make ***'
+	@echo '****************************************************'
+	if [ -r Makefile ]; then $(MAKE) distclean ; fi
+	if [ ! -d win64  ]; then mkdir win64 ; fi
+	if [ ! -r win64/Makefile ]; then (cd win64;mingw64-configure) ; fi
+	(cd win64;$(MAKE))
+	(cp win64/src/bulk_extractor.exe win64/bulk_extractor64.exe)
+	ls -l win64/bulk_extractor64.exe
+
+winlibs:
+	@echo '*****************************************'
+	@echo '*** making win32 and win64 libraries  ***'
+	@echo '*****************************************'
+	if [ -r Makefile ]; then $(MAKE) distclean ; fi
+	if [ ! -d win32  ]; then mkdir win32 ; fi
+	if [ ! -r win32/Makefile ]; then (cd win32;mingw32-configure --disable-libewf --disable-afflib) ; fi
+	(cd win32/src;$(MAKE) lib;mv libbulkextractor.so ../../libbulkextractor32.DLL)	
+	if [ ! -d win64  ]; then mkdir win64 ; fi
+	if [ ! -r win64/Makefile ]; then (cd win64;mingw64-configure --disable-libewf --disable-afflib) ; fi
+	(cd win64/src;$(MAKE) lib;mv libbulkextractor.so ../../libbulkextractor64.DLL)	
+	ls -l libbulk*.DLL
+
+
+libs-with-sceadan:
+	@echo '************************************************'
+	@echo '*** make all exes and libraries with sceadan ***'
+	@echo '************************************************'
+	if [ ! -r ../sceadan ]; then echo sceadan must be installed at ../sceadan ; exit 1 ; fi
+	/bin/rm -rf linux win32 win64
+	make distclean
+	@echo Making Linux
+	(cd ../sceadan;make clean;sh configure;make)
+	mkdir linux
+	(cd linux;../configure --with-sceadan=../../sceadan --disable-afflib --disable-libewf;cd src;make bulk_extractor libbulkextractor.so)
+	@echo Making win32
+	(cd ../sceadan;make clean;mingw32-configure;make)
 	mkdir win32
-	cp config.status temp_config.status
-	make distclean;
-	cd win32; mingw32-configure
-	cd win32/src && make
-	cp win32/src/bulk_extractor.exe win32/src/bulk_extractor32.exe
-	mv temp_config.status config.status
-	./config.status
-
-win64:
-	rm -rf win64
+	(cd win32;mingw32-configure --with-sceadan=../../sceadan --disable-afflib --disable-libewf;cd src;make bulk_extractor.exe libbulkextractor.so)
+	@echo Making win64
+	(cd ../sceadan;make clean;mingw64-configure;make)
 	mkdir win64
-	cp config.status temp_config.status
-	make distclean;
-	cd win64; mingw64-configure
-	cd win64/src && make
-	cp win64/src/bulk_extractor.exe win64/src/bulk_extractor64.exe
-	mv temp_config.status config.status
-	./config.status
+	(cd win64;mingw64-configure --with-sceadan=../../sceadan --disable-afflib --disable-libewf;cd src;make bulk_extractor.exe libbulkextractor.so)
 
-BEREL=bulk_extractor-windows_version.txt
-BEZIP=bulk_extractor-windows-$(VERSION).zip
 
-$(distdir).zip: 
-	make windist
+.PHONY: lib
+lib:
+	(cd src; $(MAKE) lib)
 
-# windist makes bulk_extractor32.exe and bulk_extractor64.exe
-# and puts them in a zip file
-windist: win32 win64
-	@echo checking to see if there are uncommitted sources
-	(if (svn status | grep '^Q') ; then exit 1 ; fi)
-	@echo nope
-	rm -rf $(distdir).zip $(distdir) src/*.exe
-	mkdir $(distdir)
-	mkdir $(distdir)/python
-	@echo
-	cp win32/src/bulk_extractor32.exe $(distdir)
-	cp win64/src/bulk_extractor64.exe $(distdir)
-	@echo ====================================
-	@echo 
-	@echo making documentation
-	make man/bulk_extractor.txt
-	mv man/bulk_extractor.txt $(distdir)
-	@echo ====================================
-	@echo 
-	@echo Creating ZIP archive
-	@echo 
-	zip -r9 $(distdir).zip $(distdir)
-	@echo ====================================
-	@echo 
-	@echo Adding text files to $(distdir).zip 
-	@echo 
-	cp python/*.{py,txt}    $(distdir)/python
-	cp ChangeLog		$(distdir)/ChangeLog.txt
-	cp NEWS			$(distdir)/NEWS.txt
-	cp COPYING		$(distdir)/COPYING.txt
-	md5deep -r  $distdir > md5list.txt
-	md5deep -rd $distdir > md5list.xml
-	mv md5list.txt md5list.xml $(distdir)
-	zip --to-crlf $(distdir).zip $(distdir)/*.txt $(distdir)/*.xml $(distdir)/python/*
-	rm -rf $(distdir) $(WINDOWSDOCS) 
-	@echo "***********************"
-	@echo "*** WINDIST IS MADE ***"
-	@echo "***********************"
-	@echo ""
-	ls -l $(distdir).*
-	@echo ""
-	@unzip -l $(distdir).zip
+.PHONY: pull
+pull:
+	git pull
+	(cd src/dfxml;git checkout master; git pull)
+	(cd src/be13_api;git checkout master; git pull)
 
-$(BEZIP): $(distdir).zip
-	mv $(distdir).zip $(BEZIP)
+.PHONY: publish
+publish:
+	$(MAKE) dist
+	scp $(DIST_ARCHIVES) ncr.nps.edu:/var/www/digitalcorpora/downloads/bulk_extractor
 
-winrelease: $(BEZIP)
-	@echo checking to see if there are uncommitted sources
-	(if (svn status | grep '^M') ; then exit 1 ; fi)
-	@echo nope
-	echo make $(distdir).zip
-	scp $(BEZIP) $(RELEASE_SSH)
-	ssh $(RELEASE_USER)$(RELEASE_HOST) 'echo $(BEZIP) > $(RELEASE_LOC)/$(BEREL)'
+gitfixup:
+	(cd src/be13_api/;git remote set-url origin git@github.com:/simsong/be13_api.git;git checkout master)
+	(cd src/dfxml/;git remote set-url origin git@github.com:/simsong/dfxml.git; git checkout master)
 
-svnclean:
-	echo these files will be deleted: 
-	svn status | grep '^[?]' | awk '{print $2;}'
-	echo 
-	echo hit return to continue
-	read
-	/bin/rm -rf `svn status | grep '^[?]' | awk '{print $2;}'`
-
-CLEANFILES = man/bulk_extractor.txt
-
-#clean-local:
-#	rm -rf win32
-#	rm -rf win64
-
-SUFFIXES = .txt .1
-.1.txt:
-	/usr/bin/tbl $< | /usr/bin/groff -S -Wall -mtty-char -mandoc -Tascii | /usr/bin/col -bx > $@
-
-.PHONY: windist win32 win64 doxygen
-
+.PHONY: libinstall
+libinstall:
+	install -D src/libbulkextractor.so $(prefix)/lib/libbulkextractor.so
+	install -D python/module/bulkextractor.py $(prefix)/lib/python2.7/dist-packages/bulkextractor.py
+	if [ -r /sbin/ldconfig ]; /sbin/ldconfig -v ; fi

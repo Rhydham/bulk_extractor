@@ -5,7 +5,16 @@
  * LGPL 2.1 license
  */
 
-#include "bulk_extractor.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
+
+/* tunable constants */
+u_int sht_null_counter_max = 10;
+u_int slt_max_name_size = 65535;
+
+/* constants from the ELF specification */
+
+
 
 #define EI_CLASS    4
 #define EI_DATA     5
@@ -441,8 +450,8 @@ struct flagnames_t elf_sh_type[] = {
     {0,0}
 };
 
-static void decode_flags (stringstream &xml,
-                          const string &sectionName,
+static void decode_flags (std::stringstream &xml,
+                          const std::string &sectionName,
                           const struct flagnames_t flagnames[],
                           const uint32_t flags)
 {
@@ -453,18 +462,18 @@ static void decode_flags (stringstream &xml,
     xml << "</" << sectionName << ">";
 }
 
-static string match_switch_case (const struct flagnames_t flagnames[],
-                                 const uint32_t needle)
+static std::string match_switch_case (const struct flagnames_t flagnames[],
+                                      const uint32_t needle)
 {
     for (int i = 0; flagnames[i].name; i++) {
         if (needle == flagnames[i].flag) return flagnames[i].name;
     }
-    return "";
+    return std::string("");
 }
 
-string getAsciiString (const sbuf_t & sbuf, size_t offset)
+std::string getAsciiString (const sbuf_t & sbuf, size_t offset)
 {
-    string str;
+    std::string str;
     
     while (sbuf[offset] != '\0') {
         if (sbuf[offset] & 0x80) return "";
@@ -515,7 +524,7 @@ std::string scan_elf32_dynamic_needed (const sbuf_t & data, const Elf32_Shdr * s
     
     // we can now loop through the dynamic entries, pull out the entires corresponding to
     // required shared objects, and add their string table entries
-    string shared_objects;
+    std::string shared_objects;
     for (uint32_t i = 0; i < shdr->sh_size / shdr->sh_entsize; i++) {
         size_t dyn_offset = shdr->sh_offset + (shdr->sh_entsize * i);
         const Elf32_Dyn * dyn = data.get_struct_ptr<Elf32_Dyn>(dyn_offset);
@@ -573,7 +582,7 @@ std::string scan_elf64_dynamic_needed (const sbuf_t & data, const Elf64_Shdr * s
     
     // we can now loop through the dynamic entries, pull out the entires corresponding to
     // required shared objects, and add their string table entries
-    string shared_objects;
+    std::string shared_objects;
     for (uint32_t i = 0; i < shdr->sh_size / shdr->sh_entsize; i++) {
         size_t dyn_offset = shdr->sh_offset + (shdr->sh_entsize * i);
         const Elf64_Dyn * dyn = data.get_struct_ptr<Elf64_Dyn>(dyn_offset);
@@ -592,10 +601,13 @@ std::string scan_elf64_dynamic_needed (const sbuf_t & data, const Elf64_Shdr * s
 
 
 // function begins with 32 bits of confidence
-string scan_elf_verify (const sbuf_t & data)
+// So look for excuses to throw out the ELF
+std::string scan_elf_verify (const sbuf_t & data)
 {
-    stringstream xml;        
-    stringstream so_xml;		// collect shared object names
+    std::stringstream xml;        
+    std::stringstream so_xml;		// collect shared object names
+    u_int sht_null_count=0;
+    
     
     xml << "<ELF";
     
@@ -608,8 +620,7 @@ string scan_elf_verify (const sbuf_t & data)
     else return "";
     
     xml << " osabi=\"" << match_switch_case(elf_e_osabi, data[EI_OSABI]) << "\"";
-    
-    xml << " abiversion=\"" << (int) data[EI_ABIVERSION] << " >";
+    xml << " abiversion=\"" << (int) data[EI_ABIVERSION] << "\" >";
         
     if (data[EI_CLASS] == ELFCLASS32) {
         const Elf32_Ehdr * ehdr = data.get_struct_ptr<Elf32_Ehdr>(0);
@@ -625,6 +636,10 @@ string scan_elf_verify (const sbuf_t & data)
         std::string machine = match_switch_case(elf_e_machine, ehdr->e_machine);
         if (machine == "") return "";
         
+	// Sanity checks
+	if(ehdr->e_ehsize < sizeof(*ehdr)) return ""; // header is smaller than the header?
+
+
         xml << "<ehdr";
         
         xml << " type=\""      << type              << "\"";
@@ -652,16 +667,25 @@ string scan_elf_verify (const sbuf_t & data)
             const Elf32_Shdr * shdr = data.get_struct_ptr<Elf32_Shdr>(shdr_offset);
             if (shdr == 0) break;
             
+	    /* Sanity check */
+	    if (shdr->sh_type == SHT_NULL && ++sht_null_count > sht_null_counter_max) return "";
+
             xml << "<section";
             
             if (shdr->sh_type == SHT_DYNAMIC) {
                 // well-formed elf binaries will have entsize set to SOMETHING
                 // (probably 8)
-                if (shdr->sh_entsize == 0) break;
+
+		if (shdr->sh_size == 0) return "";
+                if (shdr->sh_entsize == 0) return "";
                 so_xml << scan_elf32_dynamic_needed(data, shdr);
             }
             
-            if (shstr != 0) xml << " name=\"" << getAsciiString(data, shstr->sh_offset + shdr->sh_name) << "\"";
+            if (shstr != 0){
+		std::string name = getAsciiString(data, shstr->sh_offset + shdr->sh_name);
+		if(name.size()>slt_max_name_size) return ""; // sanity check
+		xml << " name=\"" << name << "\"";
+	    }
             xml << " type=\""      << match_switch_case(elf_sh_type, shdr->sh_type) << "\"";
             xml << " addr=\"0x"    << std::hex << shdr->sh_addr << "\"";
             xml << " offset=\""    << shdr->sh_offset           << "\"";
@@ -693,6 +717,10 @@ string scan_elf_verify (const sbuf_t & data)
         std::string machine = match_switch_case(elf_e_machine, ehdr->e_machine);
         if (machine == "") return "";
         
+	// Sanity checks
+	if(ehdr->e_ehsize < sizeof(*ehdr)) return ""; // header is smaller than the header?
+
+
         xml << "<ehdr";
         
         xml << " type=\""      << type              << "\"";
@@ -720,16 +748,25 @@ string scan_elf_verify (const sbuf_t & data)
             const Elf64_Shdr * shdr = data.get_struct_ptr<Elf64_Shdr>(shdr_offset);
             if (shdr == 0) break;
             
+	    /* Sanity check */
+	    if (shdr->sh_type == SHT_NULL && ++sht_null_count > sht_null_counter_max) return "";
+
             xml << "<section";
             
+
             if (shdr->sh_type == SHT_DYNAMIC) {
                 // well-formed elf binaries will have entsize set to SOMETHING
                 // (probably 8)
-                if (shdr->sh_entsize == 0) break;
+		if (shdr->sh_size == 0) return "";
+                if (shdr->sh_entsize == 0) return "";
                 so_xml << scan_elf64_dynamic_needed(data, shdr);
             }
             
-            if (shstr != 0) xml << " name=\"" << getAsciiString(data, shstr->sh_offset + shdr->sh_name) << "\"";
+            if (shstr != 0){
+		std::string name = getAsciiString(data, shstr->sh_offset + shdr->sh_name);
+		if(name.size()>slt_max_name_size) return ""; // sanity check
+		xml << " name=\"" << name << "\"";
+	    }
             xml << " type=\""      << match_switch_case(elf_sh_type, shdr->sh_type) << "\"";
             xml << " addr=\"0x"    << std::hex << shdr->sh_addr << "\"";
             xml << " offset=\""    << shdr->sh_offset           << "\"";
@@ -757,33 +794,33 @@ void scan_elf (const class scanner_params          &sp,
                const       recursion_control_block &rcb)
 {
     assert(sp.sp_version == scanner_params::CURRENT_SP_VERSION);
-    string xml;
+    std::string xml;
     
-    if (sp.phase==scanner_params::startup){
+    if (sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
         sp.info->name   = "elf";
 	sp.info->author = "Alex Eubanks";
         sp.info->feature_names.insert("elf");
         return;
     }
-    if (sp.phase==scanner_params::scan){
+    if (sp.phase==scanner_params::PHASE_SCAN){
 
 	feature_recorder *f = sp.fs.get_name("elf");
     
 	for (size_t pos = 0; pos < sp.sbuf.bufsize; pos++) {
 	    // Look for the magic number
-
-	    // find magic number
+	    // If we find it, make an sbuf and analyze...
 	    if ( (sp.sbuf[pos+0] == 0x7f)
 		 && (sp.sbuf[pos+1] == 'E')
 		 && (sp.sbuf[pos+2] == 'L')
 		 && (sp.sbuf[pos+3] == 'F')) {
-		
+
 		const sbuf_t data(sp.sbuf + pos);
-		
 		xml = scan_elf_verify(data);
 		if (xml != "") {
-		    f->write(data.pos0, data.md5(0, 4096).hexdigest().c_str(),xml);
+                    sbuf_t hdata(data,0,4096);
+                    std::string hexhash = f->fs.hasher.func(hdata.buf,hdata.bufsize);
+		    f->write(data.pos0, hexhash,xml);
 		}
 	    }
 	}    

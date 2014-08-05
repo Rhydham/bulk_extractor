@@ -13,15 +13,6 @@ import javax.swing.*;
 public class WScanBoxedRequired {
 
   public final Component component;
-  private WSelectOutputDirectory wSelectOutputFeatureDirectory;
-
-  // defaults
-  private static final boolean DEFAULT_USE_IMAGE_SOURCE = true;
- 
-  // required parameters
-  public String inputImage;
-  public static ImageSourceType imageSourceType = ImageSourceType.IMAGE_FILE;
-  public String outdir;
 
   private final JRadioButton imageFileChooserRB = new JRadioButton("Image File");
   private final JRadioButton rawDeviceChooserRB = new JRadioButton("Raw Device");
@@ -38,8 +29,6 @@ public class WScanBoxedRequired {
   public WScanBoxedRequired() {
     component = buildContainer();
     wireActions();
-    wSelectOutputFeatureDirectory = new WSelectOutputDirectory(
-                     WScan.getWScanWindow(), "Output Feature Directory");
   }
 
   private Component buildContainer() {
@@ -119,73 +108,28 @@ public class WScanBoxedRequired {
     return container;
   }
 
-  public void setDefaultValues() {
-    // required parameters
-    inputImage = "";
-    setImageSourceType(ImageSourceType.IMAGE_FILE);
-    outdir = "";
-    wSelectOutputFeatureDirectory.setDefaultValues();
+  public void setScanSettings(ScanSettings scanSettings) {
+    setImageSourceType(scanSettings.imageSourceType);
+    inputImageTF.setText(scanSettings.inputImage);
+    outdirTF.setText(scanSettings.outdir);
   }
 
-  public void setUIValues() {
-    // required parameters
-    inputImageTF.setText(inputImage);
-    outdirTF.setText(outdir);
-  }
-
-  public void getUIValues() {
-    // required parameters
-    inputImage = inputImageTF.getText();
-    outdir = outdirTF.getText();
-  }
-
-  public boolean validateValues() {
-
-    // validate the input image
-    File image = new File(inputImage);
-    if (imageSourceType == ImageSourceType.IMAGE_FILE) {
-      // validate the image file as readable and not a directory
-      if (image.isDirectory() || !image.canRead()) {
-        WError.showError("The image file provided,\n'" + image + "', is not valid."
-                         + "\nPlease verify that this path exists and is accessible.",
-                         "bulk_extractor input error", null);
-        return false;
-      }
-    } else if (imageSourceType == ImageSourceType.RAW_DEVICE) {
-      // validate the device as readable and not a directory
-      if (image.isDirectory() || !image.canRead()) {
-        WError.showError("The image device provided,\n'" + image + "', is not valid."
-                         + "\nPlease verify that this path exists and is accessible.",
-                         "bulk_extractor input error", null);
-        return false;
-      }
-    } else if (imageSourceType == ImageSourceType.DIRECTORY_OF_FILES) {
-      // validate the input directory
-      if (!image.isDirectory() || !image.canRead()) {
-        WError.showError("The input image directory provided,\n'" + image + "', is not valid."
-                         + "\nPlease verify that this path exists and is accessible.",
-                         "bulk_extractor input error", null);
-        return false;
-      }
+  public void getScanSettings(ScanSettings scanSettings) {
+    if (imageFileChooserRB.isSelected()) {
+      scanSettings.imageSourceType = ImageSourceType.IMAGE_FILE;
+    } else if (rawDeviceChooserRB.isSelected()) {
+      scanSettings.imageSourceType = ImageSourceType.RAW_DEVICE;
+    } else if (directoryOfFilesChooserRB.isSelected()) {
+      scanSettings.imageSourceType = ImageSourceType.DIRECTORY_OF_FILES;
+    } else {
+      throw new RuntimeException("bad setting");
     }
-
-    // validate the directory above the output feature directory
-    File directory = new File(outdir);
-    File parent = directory.getParentFile();
-    if (parent == null || !parent.isDirectory()) {
-      WError.showError("The folder to contain Output Feature directory\n'" + directory
-                     + "' is not valid."
-                     + "\nPlease verify that this folder exists and is accessible.",
-                     "bulk_extractor input error", null);
-      return false;
-    }
-
-    return true;
+    scanSettings.inputImage = inputImageTF.getText();
+    scanSettings.outdir = outdirTF.getText();
   }
 
   private void setImageSourceType(ImageSourceType imageSourceType) {
     // set usage variable and UI text
-    this.imageSourceType = imageSourceType;
     inputImageL.setText(imageSourceType.toString());
     inputImageTF.setText("");
     if (imageSourceType == ImageSourceType.IMAGE_FILE) {
@@ -228,11 +172,11 @@ public class WScanBoxedRequired {
       }
     });
  
-    // input image
+    // input image source, one of IMAGE_FILE, DIRECTORY_OF_FILES, or RAW_DEVICE
     inputImageChooserB.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         // open a chooser based on the selected type
-        if (imageSourceType == ImageSourceType.IMAGE_FILE) {
+        if (imageFileChooserRB.isSelected()) { // IMAGE_FILE
           // set up image chooser
           JFileChooser imageFileChooser = new JFileChooser();
           imageFileChooser.setDialogTitle("Image File to Extract Features From");
@@ -249,7 +193,7 @@ public class WScanBoxedRequired {
             inputImageTF.setText(pathString);
           }
 
-        } else if (imageSourceType == ImageSourceType.DIRECTORY_OF_FILES) {
+        } else if (directoryOfFilesChooserRB.isSelected()) { // DIRECTORY_OF_FILES
           // set up input directory chooser
           JFileChooser imageFileChooser = new JFileChooser();
           imageFileChooser.setDialogTitle("Directory of Files to Recursively Extract Features From");
@@ -264,7 +208,7 @@ public class WScanBoxedRequired {
             String pathString = imageFileChooser.getSelectedFile().getAbsolutePath();
             inputImageTF.setText(pathString);
           }
-        } else if (imageSourceType == ImageSourceType.RAW_DEVICE) {
+        } else if (rawDeviceChooserRB.isSelected()) { // RAW_DEVICE
           WRawDeviceChooser.openWindow();
           // continue here on closure
           String selection = WRawDeviceChooser.getSelection();
@@ -278,18 +222,45 @@ public class WScanBoxedRequired {
 
     // output feature directory
     outdirChooserB.addActionListener(new ActionListener() {
-      public void actionPerformed(ActionEvent e) {
-        boolean isSelected = wSelectOutputFeatureDirectory.showSelectionDialog();
-        if (isSelected) {
-          outdir = wSelectOutputFeatureDirectory.getOutputDirectory();
-          outdirTF.setText(outdir);
+      public void actionPerformed (ActionEvent e) {
+
+/* via awt.FileDialog fails too
+        FileDialog fileDialog = new FileDialog((Dialog)WScan.getWScanWindow(), "Output Feature Directory", FileDialog.SAVE);
+        fileDialog.setDirectory(outdirTF.getText());
+        fileDialog.setVisible(true);
+        outdirTF.setText(fileDialog.getFile());
+*/
+
+        // open directory chooser for selecting the output feature directory
+        // The output feature is typically new and is to be created using
+        // the file chooser's "create new directory" button.
+
+        // set up image chooser
+        JFileChooser outputFeatureDirectoryChooser = new JFileChooser();
+        outputFeatureDirectoryChooser.setDialogTitle("Output Feature Directory");
+
+        // we need OPEN_DIALOG but we want the "create new directory" button,
+        // so we use SAVE_DIALOG and hack it to say "open".
+        outputFeatureDirectoryChooser.setDialogType(JFileChooser.SAVE_DIALOG);
+//        outputFeatureDirectoryChooser.setApproveButtonText("Select");
+
+        outputFeatureDirectoryChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        outputFeatureDirectoryChooser.setSelectedFile(new File(outdirTF.getText()));
+System.setProperty("apple.awt.fileDialogForDirectories", "true");
+
+        // choose the image
+        // if the user selects it then take the text
+        if (outputFeatureDirectoryChooser.showDialog(WScan.getWScanWindow(), "Select") == JFileChooser.APPROVE_OPTION) {
+          // put the text in the text field
+          String pathString = outputFeatureDirectoryChooser.getSelectedFile().getAbsolutePath();
+          outdirTF.setText(pathString);
         }
       }
     });
   }
 
   // add file line
-  public void addFileLine(Container container, int y,
+  private void addFileLine(Container container, int y,
              JComponent fileComponent, JTextField textField, JButton button) {
     GridBagConstraints c;
 
@@ -302,8 +273,8 @@ public class WScanBoxedRequired {
     container.add(fileComponent, c);
 
     // file textField (1,y)
-    textField.setMinimumSize(new Dimension(WScan.FILE_FIELD_WIDTH, textField.getPreferredSize().height));
-    textField.setPreferredSize(new Dimension(WScan.FILE_FIELD_WIDTH, textField.getPreferredSize().height));
+    textField.setMinimumSize(new Dimension(WScan.EXTRA_WIDE_FIELD_WIDTH, textField.getPreferredSize().height));
+    textField.setPreferredSize(new Dimension(WScan.EXTRA_WIDE_FIELD_WIDTH, textField.getPreferredSize().height));
     c = new GridBagConstraints();
     c.insets = new Insets(0, 5, 0, 5);
     c.gridx = 1;

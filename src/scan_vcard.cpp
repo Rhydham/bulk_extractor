@@ -21,7 +21,8 @@
  * 3 - Throw it in a file (except the invalid stuff, of course)
  * 4 - If we didn't write a END:VCARD, add an END:VCARD  (clean it up)
  */
-#include "bulk_extractor.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -37,9 +38,8 @@ using namespace std;
 extern "C"
 void scan_vcard(const class scanner_params &sp,const recursion_control_block &rcb)
 {
-    string myString;
     assert(sp.sp_version==scanner_params::CURRENT_SP_VERSION);
-    if(sp.phase==scanner_params::startup){
+    if(sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
 	sp.info->name  = "vcard";
         sp.info->author         = "Simson Garfinkel and Tony Melaragno";
@@ -48,11 +48,10 @@ void scan_vcard(const class scanner_params &sp,const recursion_control_block &rc
 	sp.info->feature_names.insert("vcard");
 	return;
     }
-    if(sp.phase==scanner_params::scan){
+    if(sp.phase==scanner_params::PHASE_SCAN){
 	const sbuf_t &sbuf = sp.sbuf;
 	feature_recorder_set &fs = sp.fs;
 	feature_recorder *vcard_recorder = fs.get_name("vcard");
-	vcard_recorder->file_extension = ".vcf";
 	size_t end_len = strlen("END:VCARD\r\n");
 
 	// Search for BEGIN:VCARD\r in the sbuf
@@ -77,7 +76,7 @@ void scan_vcard(const class scanner_params &sp,const recursion_control_block &rc
 		/* We should probably validate the UTF-8. */
 		if(valid){
 		    /* got a valid card; I can carve it! */
-		    vcard_recorder->carve(sbuf,begin,(end-begin)+end_len);
+		    vcard_recorder->carve(sbuf,begin,(end-begin)+end_len,".vcf");
 		    i = end+end_len;		// skip to the end of the vcard
 		    continue;			// loop again!
 		}

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # coding=UTF-8
 # perform a diff of two bulk_extractor output directories.
 
@@ -9,7 +9,7 @@
 
 b'This module needs Python 2.7 or later.'
 
-__version__='1.3.0'
+__version__='1.5.0'
 import os.path,sys
 
 if sys.version_info < (2,7):
@@ -29,14 +29,24 @@ def process(out,dname1,dname2):
 
     t = ttable.ttable()
     t.append_data(['bulk_diff.py Version:',bulk_diff_version])
-    t.append_data(['PRE Image:',b1.imagefile()])
-    t.append_data(['POST Image:',b2.imagefile()])
+    t.append_data(['PRE Image:',b1.image_filename()])
+    t.append_data(['POST Image:',b2.image_filename()])
     out.write(t.typeset(mode=mode))
 
-    if b1.files.difference(b2.files):
-        print("Files only in %s:\n   %s" % (b1.name," ".join(b1.files.difference(b2.files))))
-    if b2.files.difference(b1.files):
-        print("Files only in %s:\n   %s" % (b2.name," ".join(b2.files.difference(b1.files))))
+    for i in [1,2]:
+        if i==1:
+            a=b1;b=b2
+        else:
+            b=b1;a=b2;
+        r = a.files.difference(b.files)
+        if r:
+            print("Files only in {}:".format(a.name))
+            for f in r:
+                if ".txt" in f:
+                    print("     %s (%d lines)" % (f,a.count_lines(f)))
+                else:
+                    print("     %s" % (f))
+            print("")
 
     # Report interesting differences based on the historgrams.
     # Output Example:
@@ -80,8 +90,8 @@ def process(out,dname1,dname2):
             v1 = b1.hist.get(feature,0)
             v2 = b2.hist.get(feature,0)
             if v1!=v2: diffcount += 1
-            if v2<=v1 and not options.smaller: continue
-            data.append((v1, v2, v2-v1, feature))
+            if v2>v1 or (v2==v1 and options.same) or (v2<v1 and options.smaller):
+                data.append((v1, v2, v2-v1, feature.decode('utf-8')))
 
         # Sort according the diff first, then v2 amount, then v1 amount, then alphabetically on value
         def mysortkey(a):
@@ -93,9 +103,9 @@ def process(out,dname1,dname2):
             out.write(t.typeset(mode=mode))
         if diffcount==0:
             if options.html:
-                out.write("{}: No differences\n\n".format(histogram_file))
+                out.write("{}: No differences\n".format(histogram_file))
             else:
-                out.write("{}: No differences\n\n".format(histogram_file))
+                out.write("{}: No differences\n".format(histogram_file))
             
 
 if __name__=="__main__":
@@ -109,6 +119,7 @@ if __name__=="__main__":
 """
     parser.add_option("--smaller",help="Also show values that didn't change or got smaller",
                       action="store_true")
+    parser.add_option("--same",help="Also show values that didn't change",action="store_true")
     parser.add_option("--tabdel",help="Specify a tab-delimited output file for easy import into Excel")
     parser.add_option("--html",help="HTML output. Argument is file name base")
 

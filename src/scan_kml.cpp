@@ -8,7 +8,8 @@
  * 5. Carve it! Move on
  */
 
-#include "bulk_extractor.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -27,7 +28,7 @@ void scan_kml(const class scanner_params &sp,const recursion_control_block &rcb)
 {
     string myString;
     assert(sp.sp_version==scanner_params::CURRENT_SP_VERSION);
-    if(sp.phase==scanner_params::startup){
+    if(sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
 	sp.info->name		= "kml";
         sp.info->author         = "Simson Garfinkel ";
@@ -36,11 +37,10 @@ void scan_kml(const class scanner_params &sp,const recursion_control_block &rcb)
 	sp.info->feature_names.insert("kml");
 	return;
     }
-    if(sp.phase==scanner_params::scan){
+    if(sp.phase==scanner_params::PHASE_SCAN){
 	const sbuf_t &sbuf = sp.sbuf;
 	feature_recorder_set &fs = sp.fs;
 	feature_recorder *kml_recorder = fs.get_name("kml");
-	kml_recorder->file_extension = ".kml";
 
 	// Search for <xml BEGIN:VCARD\r in the sbuf
 	// we could do this with a loop, or with 
@@ -57,7 +57,7 @@ void scan_kml(const class scanner_params &sp,const recursion_control_block &rcb)
 	    std::string possible_kml = sbuf.substr(xml_loc,kml_len);
 	    if(utf8::find_invalid(possible_kml.begin(),possible_kml.end()) == possible_kml.end()){
 		/* No invalid UTF-8 */
-		kml_recorder->carve(sbuf,xml_loc,kml_len);
+		kml_recorder->carve(sbuf,xml_loc,kml_len,".kml");
 		i = ekml_loc + 6;	// skip past end of </kml>
 	    }
 	    else {

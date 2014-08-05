@@ -1,7 +1,6 @@
+# May edit Doxyfile with doxywizard gui
 all:
 	doxygen Doxyfile
-	cd latex; make
 
 clean:
-	rm -rf latex html
-
+	rm -rf html

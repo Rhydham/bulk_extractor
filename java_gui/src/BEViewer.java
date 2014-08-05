@@ -17,12 +17,13 @@ import java.awt.Dimension;
 import java.awt.KeyboardFocusManager;
 import java.io.File;
 
+import javax.swing.JLabel;
+
 /**
  * The <code>BEViewer</code> class provides the main entry
  * for the Bulk Extractor Viewer application.
  */
 public class BEViewer {
-  public static final String LONG_FORMAT = "%1$d (0x%1$08x)";
   public static final int GUI_EDGE_PADDING = 4;
   public static final int GUI_X_PADDING = 3;
   public static final int GUI_Y_PADDING = 8;
@@ -36,21 +37,41 @@ public class BEViewer {
                            reportSelectionManager, FeaturesModel.ModelType.FEATURES_OR_HISTOGRAM);
   public static final FeaturesModel referencedFeaturesModel = new FeaturesModel(
                            reportSelectionManager, FeaturesModel.ModelType.REFERENCED_FEATURES);
-  public static final FeatureBookmarksModel featureBookmarksModel
-                    = new FeatureBookmarksModel();
+  public static final BookmarksModel bookmarksModel = new BookmarksModel();
   public static final FeatureLineSelectionManager featureLineSelectionManager
                     = new FeatureLineSelectionManager();
   public static final ImageModel imageModel = new ImageModel(featureLineSelectionManager);
   public static final UserHighlightModel userHighlightModel = new UserHighlightModel();
   public static final ImageView imageView = new ImageView(imageModel, userHighlightModel);
   public static final RangeSelectionManager rangeSelectionManager = new RangeSelectionManager();
-  public static final FeatureNavigationComboBoxModel featureNavigationComboBoxModel
-                    = new FeatureNavigationComboBoxModel(featureLineSelectionManager);
   public static final ClassificationManager classificationManager = new ClassificationManager();
+  public static final ScanSettingsListModel scanSettingsListModel = new ScanSettingsListModel();
+  private static final ScanSettingsConsumer scanSettingsConsumer = new ScanSettingsConsumer();
+/*
+static {
+//zz scan settings queue test
+ScanSettings test;
+test = new ScanSettings("-o /home/bdallen/queuetest8 /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest1 /home/bdallen/Images/ntfs1-gen2.e01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest2 -e bulk /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest3 /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest4 /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest5 /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest6 /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+test = new ScanSettings("-o /home/bdallen/queuetest7 /home/bdallen/Images/ntfs1-gen2.E01");
+scanSettingsListModel.add(test);
+}
+*/
 
-  // toolbars
-  public static final BEShortcutsToolbar shortcutsToolbar = new BEShortcutsToolbar();
-  public static final BEHighlightToolbar highlightToolbar = new BEHighlightToolbar();
+  // toolbar
+  public static final BEToolbar toolbar = new BEToolbar();
 
   // panes
   public static ReportsPane reportsPane;
@@ -128,7 +149,6 @@ public class BEViewer {
     // set the logger
     WLog.log("Bulk Extractor Viewer Version " + Config.VERSION);
     WLog.setExceptionHandling();
-    WLog.setLoggerAppender();
 
     // set native Look and Feel
     // set for Mac OS X, see http://www.devdaily.com/apple/mac/java-mac-native-look/
@@ -158,6 +178,7 @@ public class BEViewer {
     frame.setJMenuBar(new BEMenus()); // add the menubar to the frame
     KeyboardFocusManager.getCurrentKeyboardFocusManager().clearGlobalFocusOwner();
     frame.pack();
+    reportsPane.grabTreeFocus(); // it is nice to start focus here
     frame.setVisible(true);
   }
 
@@ -171,28 +192,32 @@ public class BEViewer {
     // which will set the features models and views to null
     reportsModel.remove(reportTreeNode);
 
-    // clear features in this report from the navigation history
-    featureNavigationComboBoxModel.removeAssociatedFeatures(reportTreeNode);
+    // clear features from bookmarks model that are associated with this report
+    bookmarksModel.removeAssociatedFeatureLines(reportTreeNode);
 
-    // clear features in Bookmarks that are associated with this report
-    featureBookmarksModel.removeAssociatedBookmarks(reportTreeNode);
+    // clear the image selection if it is from this report
+    FeatureLine featureLine = featureLineSelectionManager.getFeatureLineSelection();
+    if (featureLine.isFromReport(reportTreeNode)) {
+      featureLineSelectionManager.setFeatureLineSelection(new FeatureLine());
+    }
 
     // close the associated opened image readers
-    imageModel.closeImageReader(reportTreeNode.imageFile);
+    imageModel.closeImageReader(reportTreeNode.reportImageFile);
   }
 
   /**
    * Close all Reports.
    */
   public static void closeAllReports() {
-    // clear the navigation history
-    featureNavigationComboBoxModel.removeAllFeatures();
 
-    // clear the Bookmark list
-    featureBookmarksModel.removeAllBookmarks();
+    // clear all bookmarks
+    bookmarksModel.clear();
 
     // close all Reports in the reports model
     reportsModel.clear();
+
+    // clear any image selection
+    featureLineSelectionManager.setFeatureLineSelection(new FeatureLine());
 
     // close any opened image readers
     imageModel.closeAllImageReaders();
@@ -242,7 +267,7 @@ public class BEViewer {
   private void addComponents(Container pane) {
     pane.setLayout(new BorderLayout());
     // add the Tool bar to the top
-    pane.add(getToolbars(), BorderLayout.NORTH);
+    pane.add(getToolbar(), BorderLayout.NORTH);
 
     // add the splitpanes in the center
     JSplitPane innerSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, true,
@@ -257,11 +282,11 @@ public class BEViewer {
     pane.add(outerSplitPane, BorderLayout.CENTER);
   }
 
-  private Container getToolbars() {
+  private Container getToolbar() {
     Container c = new Container();
     c.setLayout(new BorderLayout());
-    c.add(shortcutsToolbar, BorderLayout.NORTH);
-    c.add(highlightToolbar, BorderLayout.SOUTH);
+    c.add(new Container(), BorderLayout.NORTH); // force restart of shading
+    c.add(toolbar, BorderLayout.CENTER);
     return c;
   }
 }

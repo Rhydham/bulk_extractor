@@ -1,30 +1,55 @@
-                                               -*- Autoconf -*-
+#                                 -*- Autoconf -*-
+# bulk_extractor configure.ac
+#
 # Process this file with autoconf to produce a configure script.
 # Order is largely irrevellant, although it must start with AC_INIT and end with AC_OUTPUT
 # See http://autotoolset.sourceforge.net/tutorial.html
 # and http://www.openismus.com/documents/linux/automake/automake.shtml
 
 AC_PREREQ(2.57)
+AC_INIT(BULK_EXTRACTOR, 1.5.1, bugs@digitalcorpora.org)
 
-AC_INIT(BULK_EXTRACTOR, 1.3, bugs@digitalcorpora.org)
 AC_CONFIG_MACRO_DIR(m4)
 
-AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile doc/user_manual/Makefile \
+# 
+# NOTE 1 - plugins/Makefile is referenced so that the plugins Makefile is created.
+# However, plugins is not listed as a SUBDIR for Makefile.am in this directory.
+# That prevents the plugins from automatically being built each time.
+#
+# NOTE 2 - src_win/Makefile is not automatically generated. This is necessary
+# so that it can be run even after a 'make distclean' is done
+AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile doc/latex_manuals/Makefile \
 			  man/Makefile python/Makefile \
+                          plugins/Makefile \
 			  specfiles/Makefile specfiles/bulk_extractor.spec.m4 \
-			  java_gui/Makefile src_win/Makefile tests/Makefile ])
-
-
+			  java_gui/Makefile tests/Makefile ])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
-AC_PROG_RANLIB
-AC_PREFIX_PROGRAM
+AC_PREFIX_PROGRAM(bulk_extractor) dnl build for same location
+
+# Programs we will be using
 AC_PROG_CC
 AC_PROG_CXX
+AC_PROG_CC_C99 
+AM_PROG_CC_C_O                    dnl allow per-produce flags
 AC_PROG_INSTALL
 AC_PROG_LEX
+# LT_INIT([disable-shared])
 
+# use C++11 mode if available; HAVE_CXX11 is defined in config.h if so.  Don't
+# use the GNU C++11 extensions for portability's sake (noext).
+# https://www.gnu.org/software/autoconf-archive/ax_cxx_compile_stdcxx_11.html
+
+m4_include([m4/ax_cxx_compile_stdcxx_11.m4])
+AX_CXX_COMPILE_STDCXX_11(noext, optional)
+
+
+# Endian check is required for MD5 implementation
+AC_C_BIGENDIAN
+
+# These are needed for bulk_extractor. They are not needed for tcpflow
+AC_DEFINE([BULK_EXTRACTOR],1,[We are compiling bulk_extractor])
 
 ## 
 ## BEViewer
@@ -76,125 +101,53 @@ if test x"$request_win_installer" == "xyes" ; then
 fi
 AM_CONDITIONAL([WANT_WIN_INSTALLER], [test x"$has_nsis" == xtrue -a x"$has_javac" == xtrue -a x"$has_jar" == xtrue])
 
-##
-## Standard macros
-##
-AC_TYPE_INT64_T
-AC_SYS_LARGEFILE
-AC_SYS_POSIX_TERMIOS
+if test x"$LEX" == x ; then
+  AC_MSG_ERROR([flex not required.])
+fi  
 
-if test "$LEX" != flex; then
-  AC_MSG_ERROR([flex not installed; required for compiling regular expressions. Try 'apt-get install flex' or 'yum install flex' or 'port install flex' or whatever package manager you happen to be using....])
+if test `basename "$LEX"` != flex; then
+  AC_MSG_ERROR([gnu flex is required.])
 fi
+
+## Determine if we can use flex -R
+if eval "echo %% | $LEX -R -t > /dev/null 2>&1"
+then 
+  AC_MSG_NOTICE([$LEX supports -R])
+else
+  AC_MSG_ERROR([$LEX does not support -R.  Please get a modern version of gnu flex])
+fi
+
+
+m4_include([m4/slg_mingw_support.m4])
+m4_include([m4/slg_searchdirs.m4])
+m4_include([m4/slg_gcc_all_warnings.m4])
 
 ################################################################
-## See if we are running on mingw
-# http://osdir.com/ml/gnu.mingw.devel/2003-09/msg00040.html
-# Note: Windows 95 WINVER=0x400
-# Windows 98 WINVER=0x400  _WIN32_WINDOWS=0x0410
-# Windows Me WINVER=0x400  _WIN32_WINDOWS=0x0490
-# Windows NT 4.0 WINVER=0x0400  _WIN32_WINNT=0x0400
-# Windows NT 4.0 SP3 WINVER=0x0400 _WIN32_WINNT=0x0403
-# Windows 2000 WINVER=0x500 _WIN32_WINNT=0x0500
-# Windows XP WINVER=0x501 _WIN32_WINNT=0x0501
-# Windows Server 2003 WINVER=0x502 _WIN32_WINNT=0x0502
-#
-# mingw32 includes  i686-w64-mingw32 and  x86_64-w64-mingw32
+## Includes
 
-mingw="no"
-case $host in
-  *-*-*linux*-*) 
-     AC_DEFINE([__LINUX__],1,[Linux operating system functions])
-     ;;
+CFLAGS="$CFLAGS"
 
-  *-*-mingw32*)   
-     LIBS="-lpsapi -lws2_32 -lgdi32 $LIBS"  # previously had -liberty 
-     CPPFLAGS="-DUNICODE -D_UNICODE -D__MSVCRT_VERSION__=0x0601 -DWINVER=0x0500 -D_WIN32_WINNT=0x0500 -g $CPPFLAGS"
-     # Removed: -DHAVE_STRUCT_TIMESPEC 
-     CXXFLAGS="$CXXFLAGS -Wno-format "  # compiler mingw-4.3.0 is broken on I64u formats
-     CFLAGS="$CFLAGS --static"
-     CPPFLAGS="$CPPFLAGS --static"
-     CXXFLAGS="$CXXFLAGS --static"
-     LDFLAGS="$LDFLAGS --static"
-     # Removed
-     # LDFLAGS="$LDFLAGS -shared-libgcc" # allows exiv2 to throw an exception that's caught elsewhere
-     mingw="yes"
-     ;;		 		     
-esac
-
-if test x"${mingw}" == "xno" ; then
-  # Bring additional directories where things might be found into our
-  # search path. I don't know why autoconf doesn't do this by default
-  for spfx in /usr/local /opt/local /sw /usr/local/ssl; do
-    AC_MSG_NOTICE([checking ${spfx}/include])
-    if test -d ${spfx}/include; then
-        CPPFLAGS="-I${spfx}/include $CPPFLAGS"
-        LDFLAGS="-L${spfx}/lib $LDFLAGS"
-        AC_MSG_NOTICE([ *** ADDING ${spfx}/include to CPPFLAGS *** ])
-        AC_MSG_NOTICE([ *** ADDING ${spfx}/lib to LDFLAGS *** ])
-    fi
-  done
-  AC_MSG_NOTICE([ CPPFLAGS = ${CPPFLAGS} ])        
-  AC_MSG_NOTICE([ LDFLAGS = ${LDFLAGS} ])        
-fi
-
-if test -r /bin/uname.exe ; then
-  if test `uname -o` == "Msys" ; then
-    AC_MSG_NOTICE([Compiling with Msys. Setting flags appropriately.])
-    LIBS="$LIBS -lws2_32 -lgdi32"
-    LDFLAGS="$LDFLAGS -Wl,--enable-auto-import"
-  fi
-fi
-################################################################
-#
-# Enable all the compiler debugging we can find
-#
-# This is originally from PhotoRec, but modified substantially by Simson
-# Figure out which flags we can use with the compiler. 
-#
-# These I don't like:
-# -Wdeclaration-after-statement -Wconversion
-# doesn't work: -Wunreachable-code 
-# causes configure to crash on gcc-4.2.1: -Wsign-compare-Winline 
-# causes warnings with unistd.h:  -Wnested-externs 
-# Just causes too much annoyance: -Wmissing-format-attribute 
-
-# Check GCC
-WARNINGS_TO_TEST="-MD -Wpointer-arith -Wmissing-declarations -Wmissing-prototypes \
-    -Wshadow -Wwrite-strings -Wcast-align -Waggregate-return \
-    -Wbad-function-cast -Wcast-qual -Wundef -Wredundant-decls -Wdisabled-optimization \
-    -Wfloat-equal -Wmultichar -Wc++-compat -Wmissing-noreturn -funit-at-a-time "
-
-if test x"${mingw}" == "xno" ; then
-  # add the warnings we do not want to do on mingw
-  WARNINGS_TO_TEST="$WARNINGS_TO_TEST -Wall -Wstrict-prototypes"
-fi
-
-echo "Warnings to test: $WARNINGS_TO_TEST"
-
-for option in $WARNINGS_TO_TEST
-do
-  SAVE_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS $option"
-  AC_MSG_CHECKING([whether gcc understands $option])
-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
-      [has_option=yes],
-      [has_option=no; CFLAGS="$SAVE_CFLAGS"])
-  AC_MSG_RESULT($has_option)
-  unset has_option
-  unset SAVE_CFLAGS
-  if test $option = "-Wmissing-format-attribute" ; then
-    AC_DEFINE(HAVE_MISSING_FORMAT_ATTRIBUTE_WARNING,1,
-		[Indicates that we have the -Wmissing-format-attribute G++ warning])
-  fi
-done
-unset option
+m4_include([src/dfxml/src/dfxml_configure.m4])
+m4_include([src/be13_api/be13_configure.m4])
 
 ################################################################
-## lift support
-## Disabled for 1.3 release
-AC_ARG_ENABLE([lift], AS_HELP_STRING([--enable-lift], [enable CMU LIFT SVM for type identification]),
-		      AC_DEFINE(USE_LIFT, 1, [Use LIFT SVM]))
+## rar support
+## Enabled for 1.4 release!
+AC_ARG_ENABLE([rar],
+              AS_HELP_STRING([--disable-rar], [Disable RAR decompression]),
+              [],
+	      [AC_DEFINE(USE_RAR, 1, [Use RAR decompression]) rar="yes"])
+AM_CONDITIONAL([RAR_ENABLED], [test "yes" = "$rar"])
+
+
+################################################################
+## lightgrep enabled
+AC_ARG_ENABLE([lightgrep],
+              AS_HELP_STRING([--enable-lightgrep], [enable LIGHTGREP]),
+	      [AC_DEFINE(USE_LIGHTGREP, 1, [Use LIGHTGREP]) lightgrep="yes"],
+              [])
+AM_CONDITIONAL([LIGHTGREP_ENABLED], [test "yes" = "$lightgrep"])
+
 
 
 ################################################################
@@ -221,69 +174,47 @@ AC_ARG_ENABLE([mcheck], AS_HELP_STRING([--enable-mcheck], \
 
 
 ################################################################
-# Check G++
-# We don't use these warnings:
-# -Waggregate-return -- aggregate returns are GOOD; they simplify code design
-# We can use these warnings after ZLIB gets upgraded:
-# -Wundef  --- causes problems with zlib
-# -Wcast-qual 
-# -Wmissing-format-attribute  --- Just too annoying
-AC_LANG_PUSH(C++)
-WARNINGS_TO_TEST="-Wall -MD -Wpointer-arith \
-    -Wshadow -Wwrite-strings -Wcast-align  \
-    -Wredundant-decls -Wdisabled-optimization \
-    -Wfloat-equal -Wmultichar -Wmissing-noreturn \
-    -Wstrict-null-sentinel -Woverloaded-virtual -Wsign-promo -funit-at-a-time"
+## AddressSanitizer support
+AC_ARG_ENABLE([address-sanitizer], AS_HELP_STRING([--enable-address-sanitizer], \
+              [enabled AddressSanitizer support for detecting a wide variety of \
+               memory allocation and deallocation errors]), \
+              [AC_DEFINE(HAVE_ADDRESS_SANITIZER, 1, [enable AddressSanitizer])
+              CFLAGS="$CFLAGS -fsanitize=address"
+              CXXFLAGS="$CXXFLAGS -fsanitize=address"
+              AC_TRY_COMPILE([],[const int i=0;],[AC_MSG_NOTICE([Address Sanitizer Enabled])],
+                                                 [AC_MSG_ERROR([Address Sanitizer not available])])
+              ])
 
-if test x"${mingw}" == "xno" ; then
-  # add the warnings we don't want to do on mingw
-  WARNINGS_TO_TEST="$WARNINGS_TO_TEST  -Weffc++"
-fi
-
-for option in $WARNINGS_TO_TEST
-do
-  SAVE_CXXFLAGS="$CXXFLAGS"
-  CXXFLAGS="$CXXFLAGS $option"
-  AC_MSG_CHECKING([whether g++ understands $option])
-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
-      [has_option=yes],
-      [has_option=no; CXXFLAGS="$SAVE_CXXFLAGS"])
-  AC_MSG_RESULT($has_option)
-  unset has_option
-  unset SAVE_CXXFLAGS
-done
-unset option
-AC_LANG_POP()    
-
-# Determine UTC date offset
-CPPFLAGS="$CPPFLAGS -DUTC_OFFSET=`date +%z`"
-
-################################################################
-# DFXML support
-AC_CHECK_HEADERS([sys/cdefs.h sys/resource.h pwd.h sys/utsname.h])
-AC_CHECK_FUNCS([localtime_r getuid gethostname getwpuid getrusage mkstemp vasprintf])
 
 ################################################################
 # PTHREAD support
 # With special nods to compiling under mingw
 
-if test  x"$mingw" = x"yes";  then
-  #AC_DEFINE([HAVE_STRUCT_TIMESPEC],1,[Required for mingw])
-  CFLAGS="$CFLAGS -mthreads "
+case $host in 
+ *mingw*)
+  AC_MSG_NOTICE([mingw pthreads support])
+  CFLAGS="$CFLAGS -mthreads -pthread "
   CPPFLAGS="-DPTW32_STATIC_LIB $CPPFLAGS"
-  CXXFLAGS="$CXXFLAGS -mthreads "
+  CXXFLAGS="$CXXFLAGS -mthreads -pthread "
+  LDFLAGS="$LDFLAGS -mthreads -pthread "
   AC_DEFINE(HAVE_PTHREAD,1,[Defined to POSIX threads for mingw])
-else
+ ;;
+ *)
+  AC_MSG_NOTICE([normal pthreads support])
   m4_include([m4/ax_pthread.m4])
+  AC_MSG_CHECKING([Running pthread test from http://www.gnu.org/software/autoconf-archive/ax_pthread.html..])
   AX_PTHREAD([
-    [echo Using settings from AX_PTHREAD]
-    LIBS="$PTHREAD_LIBS $LIBS"
-    CFLAGS="  $PTHREAD_CFLAGS $CFLAGS"
-    CXXFLAGS="$PTHREAD_CFLAGS $CXXFLAGS "
-    CPPFLAGS="$PTHREAD_CFLAGS $CPPFLAGS "
-    CC="$PTHREAD_CC"
-  ])
-fi
+              echo Using settings from AX_PTHREAD
+              LIBS="$PTHREAD_LIBS $LIBS"
+              CFLAGS="  $PTHREAD_CFLAGS $CFLAGS"
+              CXXFLAGS="$PTHREAD_CFLAGS $CXXFLAGS "
+              CC="$PTHREAD_CC"],
+            [AC_MSG_ERROR(bulk_extractor requires pthreads)])
+esac
+
+AC_MSG_NOTICE([After pthread test, CFLAGS: $CFLAGS])
+AC_MSG_NOTICE([After pthread test, CXXFLAGS: $CXXFLAGS])
+AC_MSG_NOTICE([After pthread test, LDFLAGS: $LDFLAGS])
 
 AC_CHECK_HEADERS([pthread.h])
 AC_CHECK_LIB([pthreadGC2],[pthread_create])
@@ -297,50 +228,37 @@ AC_CHECK_LIB([pthreadGC2],[pthread_create])
 
 AC_CHECK_FUNCS([pthread_win32_process_attach_np pthread_win32_process_detach_np pthread_win32_thread_attach_np pthread_win32_thread_detach_np ])
 
-AC_MSG_CHECKING([for __sync_fetch_and_add])
-AC_LINK_IFELSE(
-   [AC_LANG_SOURCE([
-    int main(void) { int i; return __sync_fetch_and_add(&i, 0); }
-   ])],
-   [
-     AC_MSG_RESULT([yes])
-     AC_DEFINE(HAVE___SYNC_FETCH_AND_ADD,1,[Defined if __sync_fetch_and_add was detected])
-    ],
-   [AC_MSG_RESULT([no])]
-)
-
-
 # end PTHREAD SUPPORT
 ################################################################
 
 # Specific include files and functions for bulk-extractor
 AC_HEADER_STDC
+AC_TYPE_INT64_T
+AC_SYS_LARGEFILE
+AC_SYS_POSIX_TERMIOS
 
 ## Check for headers used by bulk Extractor
 ## do not put pthread here
-AC_CHECK_HEADERS([alloca.h dirent.h dlfcn.h err.h errno.h fcntl.h inttypes.h libgen.h limits.h malloc.h mmap.h pwd.h signal.h stdarg.h stdint.h stdio.h strings.h string.h stdlib.h sys/cdefs.h sys/disk.h sys/fcntl.h sys/ioctl.h sys/mman.h sys/mmap.h sys/mount.h sys/param.h sys/stat.h sys/types.h sys/time.h sys/resource.h sys/sysctl.h time.h unistd.h windows.h CoreServices/CoreServices.h])
-AC_CHECK_FUNCS([err errx getuid getpwuid gethostname getrusage gmtime_r isxdigit ishexnumber le64toh localtime_r _lseeki64 inet_ntop pread64 pread printf mmap munmap MD5 mkstemp mktemp sleep SleepEx strptime usleep vasprintf warn warnx])
+AC_CHECK_HEADERS([alloca.h dirent.h dlfcn.h err.h errno.h fcntl.h inttypes.h libgen.h limits.h malloc.h mmap.h pwd.h signal.h stdarg.h stdint.h stdio.h strings.h string.h stdlib.h sys/cdefs.h sys/disk.h sys/fcntl.h sys/ioctl.h sys/mman.h sys/mmap.h sys/mount.h sys/param.h sys/socket.h sys/stat.h sys/types.h sys/time.h sys/resource.h sys/sysctl.h time.h unistd.h windows.h CoreServices/CoreServices.h])
+AC_CHECK_FUNCS([err errx getuid getpwuid gethostname getrusage gmtime_r isxdigit ishexnumber le64toh localtime_r _lseeki64 inet_ntop pread64 pread printf mmap munmap MD5 mkstemp mktemp random srandom srandomdev sleep SleepEx strptime usleep vasprintf warn warnx])
 AC_CHECK_FUNCS([CreateProcess LoadLibrary IncrementAtomic InterlockedIncrement])
 
 ## dlopen is now itself in a different library 
 ## Explicitly check for dlopen library before checking for dlopen
 ##       -ldl (see http://stackoverflow.com/questions/956640/linux-c-error-undefined-reference-to-dlopen)
 AC_CHECK_LIB([dl],[dlopen])		              
-AC_CHECK_FUNCS([dlopen])
-
-## Look for a regular expression system to use
-## tre is better than regex
-
-AC_CHECK_HEADER([tre/tre.h])
-AC_CHECK_LIB([tre],[tre_have_approx])
-AC_CHECK_FUNCS([tre_have_approx])
-
-AC_CHECK_HEADER([regex.h])
-AC_CHECK_LIB([regex],[regexec])		dnl sometimes its in a library
-AC_CHECK_FUNCS([regcomp])
+AC_CHECK_FUNCS([dlopen dlopen_preflight])
 
 # Test for sin_len
-AC_CHECK_HEADERS([arpa/inet.h netinet/in.h netinet/ip.h wsipx.h])
+AC_CHECK_HEADERS([arpa/inet.h netinet/in.h wsipx.h])
+AC_CHECK_HEADERS([netinet/ip.h], [], [],
+[[
+#include <sys/types.h>
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+]])
+
 AC_CHECK_MEMBER([struct sockaddr_in.sin_len],
 		[AC_DEFINE(HAVE_SOCKADDR_IN_SIN_LEN, 1, [Do we have sockaddr.sin_len?])],
 		[],
@@ -357,50 +275,144 @@ AC_ARG_WITH([opt], AC_HELP_STRING([--without-opt], [Drop all -O C flags]))
 # Or maybe just tone it down a bit?
 AC_ARG_WITH([o3], AC_HELP_STRING([--without-o3], [Do not force O3 optimization; use default level]))
 
+#
 # ZLIB is required:
-#  Not you cannot put comments in the AC_MSG_ERROR for some reason
+#  Note you cannot put comments in the AC_MSG_ERROR for some reason
+# Must be before ewf
 AC_CHECK_LIB([z],[uncompress],,
-	AC_MSG_ERROR([zlib libraries not installed; try installing zlib-dev zlib-devel zlib1g-dev or libz-dev]))
+	AC_MSG_ERROR([zlib libraries not installed; try installing zlib-devel zlib-dev zlib-devel zlib1g-dev or libz-dev]))
+
+## EXPAT is now a main line requirements for restarting
+AC_CHECK_HEADERS([expat.h])
+AC_CHECK_LIB([expat],[XML_ParserCreate])
 
 ################################################################
 ## regex support
 ## there are several options
+## tre is better than regex
+AC_CHECK_LIB([stdc++],[main])
+
+if test x"$lightgrep" == x"yes"; then
+  m4_ifndef([PKG_CHECK_MODULES],
+            [AC_MSG_ERROR([pkg-config autoconf macros are missing; try installing pkgconfig])])
+
+  if test x"$mingw" == x"yes" ; then
+    # get static flags when cross-compiling with mingw
+    PKG_CONFIG="$PKG_CONFIG --static"
+  else
+    # pkg-config doesn't look in /usr/local/lib on some systems
+    if test x"$PKG_CONFIG_PATH" != x; then
+      export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
+    else
+      export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+    fi
+  fi
+
+  m4_ifdef([PKG_CHECK_MODULES],
+           [PKG_CHECK_MODULES([lightgrep], [lightgrep])])
+
+  AC_DEFINE([HAVE_LIBLIGHTGREP], 1, [Define to 1 if you have liblightgrep.])
+
+  CPPFLAGS="$CPPFLAGS $lightgrep_CFLAGS"
+  LIBS="$LIBS `$PKG_CONFIG --libs-only-l lightgrep`"
+  LDFLAGS="$LDFLAGS `$PKG_CONFIG --libs-only-L --libs-only-other lightgrep`"
+fi
+
 AC_CHECK_HEADERS([regex.h tre/tre.h])
+AC_CHECK_LIB([regex],[regcomp])
 AC_CHECK_LIB([tre],[tre_regcomp])
 AC_CHECK_FUNCS([regcomp tre_regcomp tre_version])
-
 
 ################################################################
 ## AFFLIB support
 ## AFFLIB requires OpenSSL
 ## Link in openssl if it is available, because afflib requires it.
 ## (Note that bulk_extractor itself no longer requires openssl)
-AC_CHECK_HEADERS([openssl/aes.h openssl/bio.h openssl/evp.h openssl/hmac.h openssl/md5.h openssl/pem.h openssl/rand.h openssl/rsa.h openssl/sha.h openssl/pem.h openssl/x509.h])
-AC_CHECK_LIB([crypto],[EVP_get_digestbyname])	# if crypto is available, get it
-AC_CHECK_LIB([md],[MD5])                        # if libmd is available, get it 
-AC_CHECK_LIB([ssl],[SSL_library_init],,
-     AC_MSG_WARN([OpenSSL developer library 'libssl-dev' or 'openssl-devel' not installed; AFFLIB not available]))
-AC_CHECK_FUNCS([MD5_Init EVP_get_digestbyname])
+AC_DEFINE([HAVE_STL],1,[We have the Standard Template Library])
+AC_CHECK_HEADERS([openssl/x509.h openssl/pem.h])
 
-AC_CHECK_HEADER([afflib/afflib.h],
+AC_ARG_ENABLE([afflib],
+    [AS_HELP_STRING([--disable-afflib], [disable afflib support])],
+    [afflib=no],
+    [afflib=yes])
+AC_MSG_NOTICE([afflib is $afflib])
+
+if test x"$afflib" == x"yes" ; then
+  AC_CHECK_HEADER([afflib/afflib.h],
 	    	[AC_DEFINE(HAVE_AFFLIB_AFFLIB_H,1,[Do we have afflib/afflib.h?])]
 		[AC_CHECK_LIB([afflib],af_get_pagesize,,
 	   AC_MSG_WARN([AFFLIB not found or the version of AFFLIB installed does not support af_get_pagesize; no AFF support]))],
 	[])
+fi
 
 
 ################################################################
 ## LIBEWF support
-libewf=yes
-AC_CHECK_HEADER([libewf.h],
+
+AC_ARG_ENABLE([libewf],
+    [AS_HELP_STRING([--disable-libewf], [disable libewf support])],
+    [libewf=no],
+    [libewf=yes])
+AC_MSG_NOTICE([libewf is $libewf])
+if test x"$libewf" == x"yes" ; then
+  AC_CHECK_HEADER([libewf.h],
 	[AC_DEFINE(HAVE_LIBEWF_H,1,[Do we have libewf.h?])]
 	[AC_CHECK_LIB([ewf],[libewf_get_version],,
 		[AC_MSG_WARN([libewf not found; no E01 support])]
 		[libewf=no])],
 	[AC_MSG_WARN([libewf.h not found; no E01 support])]
 	[libewf=no])
-AC_CHECK_FUNCS([libewf_handle_get_utf8_header_value_notes libewf_error_backtrace_fprint])
-AC_CHECK_HEADERS([tsk3/libtsk.h])
+  AC_CHECK_FUNCS([libewf_handle_get_utf8_header_value_notes libewf_error_backtrace_fprint])
+fi
+AC_MSG_NOTICE([libewf is now $libewf])
+
+
+################################################################
+## hashdb support
+AC_ARG_ENABLE([hashdb],
+    [AS_HELP_STRING([--disable-hashdb], [disable hashdb scanner support])],
+    [hashdb=no],
+    [hashdb=yes])
+
+if test x"$hashdb" == x"yes" ; then
+  if test x"$mingw" = x"yes";  then
+    # the win32 configuration of libxml2 requires zlib and iconv libraries
+    AC_CHECK_LIB([z], [gzdopen],[LIBS="-lz $LIBS"], [AC_MSG_ERROR([Could not find zlib library])])
+    AC_CHECK_LIB([iconv], [iconv],[LIBS="-liconv $LIBS"], [AC_MSG_ERROR([Could not find win-iconv library])])
+  fi
+
+  AC_CHECK_LIB([xml2], [xmlSAXUserParseFile],[LIBS="-lxml2 $LIBS"],
+    [AC_MSG_WARN([Could not find libxml2 library required to build the hashdb scanner])
+    hashdb=no])
+
+  if test x"$hashdb" == xyes ; then
+    AX_BOOST_BASE([1.53],
+      [AX_BOOST_SYSTEM
+      AX_BOOST_FILESYSTEM
+      AX_BOOST_IOSTREAMS
+      LIBS="$BOOST_SYSTEM_LIB $BOOST_FILESYSTEM_LIB $BOOST_IOSTREAMS_LIB $LIBS"],
+      [AC_MSG_WARN([Boost 1.53 or newer is required to build the hashdb scanner])
+      hashdb=no])
+  fi
+
+  if test x"$hashdb" == xyes ; then
+    AC_LANG_PUSH(C++)
+    AC_CHECK_HEADER([hashdb.hpp], [],
+      [AC_MSG_WARN([Could not find hashdb header file required to build the hashdb scanner])
+      hashdb=no])
+    AC_CHECK_LIB([hashdb], [hashdb_version], [],
+      [AC_MSG_WARN([Could not find hashdb library required to build the hashdb scanner])
+      hashdb=no])
+    AC_LANG_POP()
+  fi
+
+fi
+if test x"$hashdb" == xyes ; then
+  AC_DEFINE(HAVE_HASHDB,1,[define 1 to build the hashdb scanner])
+else
+  AC_MSG_NOTICE([the hashdb scanner will not be built])
+fi
+
 
 ################################################################
 ## exiv2 support
@@ -422,12 +434,8 @@ if test x"$exiv2" == x"yes" ; then
   fi
 fi
 if test x"$exiv2" == x"yes" ; then
-  AC_CHECK_HEADER([expat.h])
-  AC_CHECK_LIB([expat],[XML_ParserCreate])
-  AC_CHECK_HEADER([exiv2/image.hpp])
-  AC_CHECK_HEADER([exiv2/exif.hpp])
-  AC_CHECK_HEADER([exiv2/error.hpp])
   AC_LANG_PUSH(C++)
+  AC_CHECK_HEADERS([exiv2/image.hpp exiv2/exif.hpp exiv2/error.hpp])
     AC_TRY_COMPILE([#include <exiv2/image.hpp>
     	    	    #include <exiv2/exif.hpp>
                     #include <exiv2/error.hpp>],
@@ -452,10 +460,46 @@ if test x"$exiv2" == x"yes" ; then
   AC_LANG_POP()    
 fi
 
-AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Wshadow"],[int a=3;],
-  [AC_DEFINE(GNUC_HAS_DIAGNOSTIC_PRAGMA,1,[define 1 if GCC supports #pragma GCC diagnostic])]
-)
+AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Wshadow"],[return 0;],
+  [AC_DEFINE(HAVE_DIAGNOSTIC_SHADOW,1,[define 1 if GCC supports -Wshadow])])
+
+AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Wundef"],[return 0;],
+  [AC_DEFINE(HAVE_DIAGNOSTIC_UNDEF,1,[define 1 if GCC supports -Wundef])])
+
+AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Wcast-qual"],[return 0;],
+  [AC_DEFINE(HAVE_DIAGNOSTIC_CAST_QUAL,1,[define 1 if GCC supports -Wcast-qual])])
+
+AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Weffcpp"],[return 0;],
+  [AC_DEFINE(HAVE_DIAGNOSTIC_EFFCPP,1,[define 1 if GCC supports -Weffc++])])
+
+AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"],[return 0;],
+  [AC_DEFINE(HAVE_DIAGNOSTIC_SUGGEST_ATTRIBUTE,1,[define 1 if GCC supports -Wsuggest-attribute=noreturn])])
   
+AC_TRY_COMPILE([#pragma GCC diagnostic ignored "-Wdeprecated-register"],[return 0;],
+  [AC_DEFINE(HAVE_DIAGNOSTIC_DEPRECATED_REGISTER,1,[define 1 if GCC supports -Wdeprecated-register])])
+  
+################################################################
+## sceadan support
+## Enabled for 1.5 release
+# m4_include([src/sceadan/sceadan_configure.m4])
+# https://www.gnu.org/software/autoconf/manual/autoconf-2.60/html_node/External-Software.html
+AC_ARG_WITH([sceadan],
+              AS_HELP_STRING([--with-sceadan], [specify location of UTSA SCEADAN file type identification]),
+	      [AC_DEFINE(USE_SCEADAN, 1, [Use SCEADAN FILE TYPE CLASSIFIER]) 
+               sceadan="yes"
+               SCEADAN_DIR=$withval
+               CPPFLAGS="$CPPFLAGS -I$SCEADAN_DIR/src -I../$SCEADAN_DIR/src -I../../$SCEADAN_DIR/src"
+               LDFLAGS="$LDFLAGS -L$SCEADAN_DIR/ -L$SCEADAN_DIR/src/.libs -L../$SCEADAN_DIR/src/.libs"
+               AC_CHECK_LIB([m],[fmax],,AC_MSG_ERROR([missing -lm]))
+               AC_CHECK_LIB([sceadan],[sceadan_open],,AC_MSG_ERROR([missing -lsceadan]))
+              ],
+              [])
+
+AC_SUBST(SCEADAN_DIR)
+AM_CONDITIONAL([SCEADAN_ENABLED], [test "yes" = "$sceadan"])
+
+
+
 ################################################################
 # do we have a broken strchr?
 # This prevents errors in base64_forensics.cpp
@@ -471,16 +515,17 @@ else
   AC_MSG_NOTICE([strchr is not conforming])
 fi
 AC_LANG_POP()
-################################################################
-#
-# Do we have the CPUID instruction?
-AC_TRY_COMPILE([#define cpuid(id) __asm__( "cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(id), "b"(0), "c"(0), "d"(0))],
-			[unsigned long eax, ebx, ecx, edx;cpuid(0);],
-			have_cpuid=yes,
-			have_cpuid=no)
-if test "$have_cpuid" = yes; then
- AC_DEFINE(HAVE_ASM_CPUID, 1, [define to 1 if __asm__ CPUID is available])
+
+## If compiling on mingw, add another -lgdi32 to be safe
+## This is required becuase some libraries reference functions in gdi32 and, for whatever reason,
+## the linker is not smart enough to re-check the library
+if test x"$mingw" = x"yes" ; then
+  LIBS="$LIBS -lgdi32"
+else
+  CFLAGS="$CFLAGS -fPIC"
+  CXXFLAGS="$CXXFLAGS -fPIC"
 fi
+
 
 ################################################################
 ############## drop optimization flags and add -g if requested ################
@@ -503,7 +548,6 @@ else
   fi
 fi
 
-
 AC_MSG_NOTICE([*************************************])
 AC_MSG_NOTICE([*************************************])
 AC_MSG_NOTICE([  PACKAGE_NAME:     $PACKAGE_NAME])
@@ -515,6 +559,10 @@ AC_MSG_NOTICE([  CFLAGS:           $CFLAGS])
 AC_MSG_NOTICE([  CXXFLAGS:         $CXXFLAGS])
 AC_MSG_NOTICE([  LIBS:             $LIBS])
 AC_MSG_NOTICE([  LDFLAGS:          $LDFLAGS])
+
+#
+# Generate special warnings
+#
 
 if test x"${libewf}" != "xyes" ; then
   AC_MSG_WARN([libewf-devel must be installed for E01 support.])
@@ -535,7 +583,6 @@ else
   AC_MSG_NOTICE([NOTE: BEViewer is disabled.])
 fi
 
-
 AC_OUTPUT
 
 ## Create the BEViewer Java config file
@@ -552,4 +599,7 @@ echo "#define CFLAGS   \"$CFLAGS\""   >> config.h
 echo "#define CXXFLAGS \"$CXXFLAGS\"" >> config.h
 echo "#define LIBS     \"$LIBS\""     >> config.h
 echo "#define LDFLAGS  \"$LDFLAGS\""  >> config.h
+if test x"$GIT_COMMIT" != "x" ; then
+  echo "#define GIT_COMMIT  \"$GIT_COMMIT\""  >> config.h
+fi
 

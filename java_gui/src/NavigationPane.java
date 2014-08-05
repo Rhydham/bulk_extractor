@@ -23,13 +23,9 @@ public final class NavigationPane extends Container {
   private static final int EDGE_PADDING = BEViewer.GUI_EDGE_PADDING;
   private static final int Y_PADDING = BEViewer.GUI_Y_PADDING;
   private static final long serialVersionUID = 1;
-  private JButton bookmarkB;
-  private JButton deleteB;
-//  private JComboBox<FeatureLine> navigationComboBox;
-  private JComboBox navigationComboBox;
   private FileComponent imageFileLabel;
   private FileComponent featuresFileLabel;
-  private TextComponent featurePathLabel;
+  private TextComponent forensicPathLabel;
   private TextComponent featureLabel;
   private ImageComponent imageComponent;
   private JRadioButton textViewRB;
@@ -38,8 +34,6 @@ public final class NavigationPane extends Container {
   private JButton reverseB;
   private JButton homeB;
   private JButton forwardB;
-
-  private static final String NULL_LABEL = "<Not selected>";
 
   /**
    * Constructs navigation interfaces and wires actions.
@@ -58,32 +52,25 @@ public final class NavigationPane extends Container {
     BEViewer.featureLineSelectionManager.addFeatureLineSelectionManagerChangedListener(new Observer() {
       public void update(Observable o, Object arg) {
 
-        // set fields based on the selected feature line
+        // get the selected feature line
         final FeatureLine featureLine = BEViewer.featureLineSelectionManager.getFeatureLineSelection();
 
-        // set navigation view based on the FeatureLine
-        if (featureLine != null
-            && (featureLine.getType() == FeatureLine.FeatureLineType.ADDRESS_LINE
-             || featureLine.getType() == FeatureLine.FeatureLineType.PATH_LINE)) {
+        // set navigation text and button state based on the FeatureLine
+        if (!featureLine.isBlank() && !ForensicPath.isHistogram(featureLine.firstField)) {
  
-          // set fields based on feature
-          imageFileLabel.setFile(featureLine.getImageFile());
-          featuresFileLabel.setFile(featureLine.getFeaturesFile());
-          featurePathLabel.setComponentText(featureLine.getFormattedFirstField(
-                                            BEViewer.imageView.getAddressFormat()));
-          featureLabel.setComponentText(featureLine.getFormattedFeatureText());
-          deleteB.setEnabled(true);
-          bookmarkB.setEnabled(true);
+          // set navigation fields
+          imageFileLabel.setFile(featureLine.actualImageFile);
+          featuresFileLabel.setFile(featureLine.featuresFile);
+          forensicPathLabel.setComponentText(ForensicPath.getPrintablePath(featureLine.forensicPath, BEViewer.imageView.getUseHexPath()));
+          featureLabel.setComponentText(featureLine.formattedFeature);
 
         } else {
 
-          // clear fields
+          // clear navigation fields
           imageFileLabel.setFile(null);
           featuresFileLabel.setFile(null);
-          featurePathLabel.setComponentText(null);
+          forensicPathLabel.setComponentText(null);
           featureLabel.setComponentText(null);
-          deleteB.setEnabled(false);
-          bookmarkB.setEnabled(false);
         }
       }
     });
@@ -108,12 +95,12 @@ public final class NavigationPane extends Container {
             throw new RuntimeException("Invalid state");
           }
 
-        } else if (changeType == ImageView.ChangeType.ADDRESS_FORMAT_CHANGED) {
-          if (BEViewer.imageView.getImagePage() != null && BEViewer.imageView.getImagePage().featureLine != null) {
-            FeatureLine featureLine = BEViewer.imageView.getImagePage().featureLine;
-            featurePathLabel.setComponentText(
-                   featureLine.getFormattedFirstField(BEViewer.imageView.getAddressFormat()));
+        } else if (changeType == ImageView.ChangeType.FORENSIC_PATH_NUMERIC_BASE_CHANGED) {
+          if (BEViewer.imageView.getImagePage() != null) {
+            ImageModel.ImagePage imagePage = BEViewer.imageView.getImagePage();
+            forensicPathLabel.setComponentText(ForensicPath.getPrintablePath(imagePage.featureLine.forensicPath, BEViewer.imageView.getUseHexPath()));
           }
+
         } else {
           // no action for other change types
         }
@@ -122,23 +109,23 @@ public final class NavigationPane extends Container {
   }
 
   private void setPanState(ImageModel.ImagePage imagePage) {
-    // set forward, reverse, and home button state based on values from imageView's imagePage
-    if (imagePage == null || imagePage.pageBytes.length == 0) {
+    // set forward, reverse, and home button state based on the forensic path of the active page
+    if (imagePage.pageBytes.length == 0) {
       // there is no image to pan
       homeB.setEnabled(false);
       reverseB.setEnabled(false);
       forwardB.setEnabled(false);
     } else {
-      long pageStartAddress = BEViewer.imageView.getImagePage().pageStartAddress;
+      long offset = ForensicPath.getOffset(imagePage.pageForensicPath);
 
       // set home button state
       homeB.setEnabled(true);
 
       // set reverse button state
-      reverseB.setEnabled(imagePage.pageStartAddress > 0);
+      reverseB.setEnabled(offset > 0);
 
       // set forward button state
-      forwardB.setEnabled(pageStartAddress + ImageModel.PAGE_SIZE < imagePage.imageSize);
+      forwardB.setEnabled(offset + ImageModel.PAGE_SIZE < imagePage.imageSize);
     }
   }
 
@@ -152,39 +139,11 @@ public final class NavigationPane extends Container {
     int y = 0;
 
     // ************************************************************
-    // (0,0) title "Navigation"
+    // (0,y++) Feature line statistics
     // ************************************************************
     c = new GridBagConstraints();
 //    c.insets = new Insets(0, 5, 0, 5);
-    c.insets = new Insets(EDGE_PADDING, EDGE_PADDING, 0, EDGE_PADDING);
-    c.gridx = 0;
-    c.gridy = y++;
-    c.fill = GridBagConstraints.HORIZONTAL;
-
-    // add the navigation title
-    add(new JLabel("Navigation"), c);
-
-    // ************************************************************
-    // (0,1) Navigation control
-    // ************************************************************
-    c = new GridBagConstraints();
-//    c.insets = new Insets(0, 5, 0, 5);
-    c.insets = new Insets(0, EDGE_PADDING, 0, EDGE_PADDING);
-    c.gridx = 0;
-    c.gridy = y++;
-    c.weightx = 1;
-    c.weighty = 0;
-    c.fill = GridBagConstraints.HORIZONTAL;
-
-    // add the navigation control container
-    add(getNavigationControl(), c);
-
-    // ************************************************************
-    // (0,2) Feature line statistics
-    // ************************************************************
-    c = new GridBagConstraints();
-//    c.insets = new Insets(0, 5, 0, 5);
-    c.insets = new Insets(0, EDGE_PADDING, Y_PADDING, EDGE_PADDING);
+    c.insets = new Insets(EDGE_PADDING, EDGE_PADDING, Y_PADDING, EDGE_PADDING);
     c.gridx = 0;
     c.gridy = y++;
     c.weightx = 1;
@@ -195,7 +154,7 @@ public final class NavigationPane extends Container {
     add(getFeatureStats(), c);
 
     // ************************************************************
-    // (0,3) title "Image"
+    // (0,y++) title "Image"
     // ************************************************************
     c = new GridBagConstraints();
     c.insets = new Insets(0, EDGE_PADDING, 0, EDGE_PADDING);
@@ -207,7 +166,7 @@ public final class NavigationPane extends Container {
     add(new JLabel("Image"), c);
 
     // ************************************************************
-    // (0,4) Image table
+    // (0,y++) Image table
     // ************************************************************
     c = new GridBagConstraints();
     c.insets = new Insets(0, EDGE_PADDING, 0, EDGE_PADDING);
@@ -221,7 +180,7 @@ public final class NavigationPane extends Container {
     add(getImageTable(), c);
 
     // ************************************************************
-    // (0,5) Image table controls
+    // (0,y++) Image table controls
     // ************************************************************
     c = new GridBagConstraints();
 //    c.insets = new Insets(0, 5, 0, 5);
@@ -234,134 +193,6 @@ public final class NavigationPane extends Container {
 
     // add the image table
     add(getImageTableControls(), c);
-  }
-
-  // ************************************************************
-  // navigation control
-  // ************************************************************
-@SuppressWarnings("unchecked") // hacked until we don't require javac6
-  private Container getNavigationControl() {
-    Container container = new Container();
-    container.setLayout(new GridBagLayout());
-    GridBagConstraints c;
-
-    // (0,0) JButton <bookmark>
-    c = new GridBagConstraints();
-    c.insets = new Insets(0, 0, 0, BEViewer.GUI_X_PADDING);
-    c.gridx = 0;
-    c.gridy = 0;
-    c.weightx = 0;
-    c.anchor = GridBagConstraints.LINE_START;
-
-    // create bookmark button
-    bookmarkB = new JButton(BEIcons.BOOKMARK_16);
-    bookmarkB.setFocusable(false);
-    bookmarkB.setRequestFocusEnabled(false);
-    bookmarkB.setMinimumSize(BEViewer.BUTTON_SIZE);
-    bookmarkB.setPreferredSize(BEViewer.BUTTON_SIZE);
-    bookmarkB.setToolTipText("Bookmark this Feature");
-    bookmarkB.setEnabled(false);
-
-    // add the bookmark button
-    container.add(bookmarkB, c);
-
-    // clicking the bookmark button adds this feature entry to the bookmark list
-    bookmarkB.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        BEViewer.featureBookmarksModel.addBookmark(
-                   BEViewer.featureLineSelectionManager.getFeatureLineSelection());
-      }
-    });
-
-/*
-    // (1,0) vertical separator
-    c = new GridBagConstraints();
-    c.insets = new Insets(0, 0, 0, 0);
-    c.gridx = 1;
-    c.gridy = 0;
-    c.weightx = 0;
-    c.anchor = GridBagConstraints.LINE_START;
-    c.fill = GridBagConstraints.VERTICAL;
-    container.add(new JSeparator(SwingConstants.VERTICAL), c);
-*/
-
-    // (2,0) JButton <delete>
-    c = new GridBagConstraints();
-    c.insets = new Insets(0, 0, 0, BEViewer.GUI_X_PADDING);
-    c.gridx = 2;
-    c.gridy = 0;
-    c.weightx = 0;
-    c.anchor = GridBagConstraints.LINE_START;
-
-    // Delete Feature button
-    deleteB = new JButton(BEIcons.DELETE_16);
-    deleteB.setFocusable(false);
-    deleteB.setRequestFocusEnabled(false);
-    deleteB.setMinimumSize(BEViewer.BUTTON_SIZE);
-    deleteB.setPreferredSize(BEViewer.BUTTON_SIZE);
-    deleteB.setToolTipText("Remove this Feature");
-    deleteB.setEnabled(false);
-
-    // add the delete button
-    container.add(deleteB, c);
-
-    // clicking the delete button removes the feature from the feature list
-    deleteB.addActionListener(new ActionListener() {
-      public void actionPerformed (ActionEvent e) {
-        FeatureLine featureLine = (FeatureLine)BEViewer.featureNavigationComboBoxModel.getSelectedItem();
-
-        // the button should be disabled when there is no selected feature line
-        if (featureLine == null) {
-          throw new NullPointerException();
-        }
-
-        // the selection should match the selection manager
-        if (!featureLine.equals(BEViewer.featureLineSelectionManager.getFeatureLineSelection())) {
-          throw new RuntimeException("invalid state");
-        }
-
-        // remove the current selection
-        // NOTE: setSelectedItem fires clearing the selection in featureLineSelectionManager
-        BEViewer.featureNavigationComboBoxModel.setSelectedItem(null);
-        BEViewer.featureNavigationComboBoxModel.removeElement(featureLine);
-      }
-    });
-
-    // (3,0) navigation comboBox
-    c = new GridBagConstraints();
-    c.insets = new Insets(0, 0, 0, 0);
-    c.gridx = 3;
-    c.gridy = 0;
-    c.weightx = 1;
-    c.fill = GridBagConstraints.HORIZONTAL;
-
-//    navigationComboBox = new JComboBox<FeatureLine>(BEViewer.featureNavigationComboBoxModel);
-    navigationComboBox = new JComboBox(BEViewer.featureNavigationComboBoxModel);
-    navigationComboBox.setFocusable(false);
-//    navigationComboBox.requestFocusInWindow();  // as a user convenience, focus this item first.
-    navigationComboBox.setRenderer(new FeatureListCellRenderer());
-
-    // set the prototype value so Swing knows the height of JComboBox when it is empty
-    navigationComboBox.setPrototypeDisplayValue(new FeatureLine());
-
-    navigationComboBox.setMaximumRowCount(16);
-    navigationComboBox.addActionListener(new ActionListener() {
-      public void actionPerformed(ActionEvent e) {
-        // The feature line selection manager changes the combo box selection.
-        // The combo box selection changes the feature line selection manager
-        // but only if the feature line selection manager had a different feature line.
-        // So: no event loop.
-
-        // determine equivalency, allowing null
-        FeatureLine featureLine = (FeatureLine)navigationComboBox.getSelectedItem();
-        BEViewer.featureLineSelectionManager.setFeatureLineSelection(featureLine);
-      }
-    });
-    navigationComboBox.setToolTipText("Navigate to this Feature");
-
-    container.add(navigationComboBox, c);
-
-    return container;
   }
 
   // ************************************************************
@@ -416,23 +247,23 @@ public final class NavigationPane extends Container {
     // add the features file label
     container.add(featuresFileLabel, c);
 
-    // (0,2) Feature Path
+    // (0,2) Forensic Path
     c = new GridBagConstraints();
     c.insets = new Insets(0, 0, 0, 10);
     c.gridx = 0;
     c.gridy = 2;
     c.fill = GridBagConstraints.HORIZONTAL;
-    container.add(new JLabel("Feature Path"), c);
+    container.add(new JLabel("Forensic Path"), c);
 
-    // (1,2) <feature path>
+    // (1,2) <forensic path>
     c = new GridBagConstraints();
     c.insets = new Insets(0, 0, 0, 0);
     c.gridx = 1;
     c.gridy = 2;
     c.weightx = 1;
     c.fill = GridBagConstraints.HORIZONTAL;
-    featurePathLabel = new TextComponent();
-    container.add(featurePathLabel, c);
+    forensicPathLabel = new TextComponent();
+    container.add(forensicPathLabel, c);
 
     // (0,3) Feature text
     c = new GridBagConstraints();
@@ -548,17 +379,18 @@ public final class NavigationPane extends Container {
     // clicking the reverse button scrolls back one page
     reverseB.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
-        // get the exising page start address
-        long pageStartAddress = BEViewer.imageView.getImagePage().pageStartAddress;
+        // get the exising page offset
+        ImageModel.ImagePage imagePage = BEViewer.imageView.getImagePage();
+        long offset = ForensicPath.getOffset(imagePage.pageForensicPath);
 
-        // page back one page unless the new address is out of range
-        if (pageStartAddress >= ImageModel.PAGE_SIZE) {
-          pageStartAddress -= ImageModel.PAGE_SIZE;
-          BEViewer.imageModel.setPageStartAddress(pageStartAddress);
+        // page back one page unless the new forensic path is out of range
+        if (offset >= ImageModel.PAGE_SIZE) {
+          offset -= ImageModel.PAGE_SIZE;
+          BEViewer.imageModel.setImageSelection(ForensicPath.getAdjustedPath(imagePage.pageForensicPath, offset));
         } else {
           WError.showError(
                       "Already at beginning of file.",
-                      "BEViewer Image File address error", null);
+                      "BEViewer Image File pan error", null);
         }
       }
     });
@@ -570,7 +402,7 @@ public final class NavigationPane extends Container {
     c.gridx = 3;
     c.gridy = 0;
 
-    // create the home button for paging back to the page containing the selected address
+    // create the home button for paging back to the page containing the selected forensic path
     homeB = new JButton(BEIcons.HOME_16);
     homeB.setFocusable(false);
     homeB.setRequestFocusEnabled(false);
@@ -582,12 +414,12 @@ public final class NavigationPane extends Container {
     // add the Home button
     container.add(homeB, c);
 
-    // clicking the Home button pages back to the page containing the selected address
+    // clicking the Home button pages back to the page containing the selected forensic path
     homeB.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
         // return to the home page
-        FeatureLine featureLine = BEViewer.imageView.getImagePage().featureLine;
-        BEViewer.imageModel.setPageStartAddress(ImageModel.getAlignedAddress(featureLine));
+        ImageModel.ImagePage imagePage = BEViewer.imageView.getImagePage();
+        BEViewer.imageModel.setImageSelection(ForensicPath.getAlignedPath(imagePage.featureLine.forensicPath));
       }
     });
 
@@ -613,21 +445,21 @@ public final class NavigationPane extends Container {
     forwardB.addActionListener(new ActionListener() {
       public void actionPerformed (ActionEvent e) {
 
-        // get the exising page start address
-        long pageStartAddress = BEViewer.imageView.getImagePage().pageStartAddress;
+        // get the exising page offset
+        ImageModel.ImagePage imagePage = BEViewer.imageView.getImagePage();
+        long offset = ForensicPath.getOffset(imagePage.pageForensicPath);
 
-        // get the file size
-        long imageSize = BEViewer.imageView.getImagePage().imageSize;
+        // get the image size
+        long imageSize = imagePage.imageSize;
 
-        // page forward one page unless the new address is out of range
-        if (pageStartAddress + ImageModel.PAGE_SIZE < imageSize) {
-          pageStartAddress += ImageModel.PAGE_SIZE;
-          BEViewer.imageModel.setPageStartAddress(pageStartAddress);
+        // page forward one page unless the new offset is out of range
+        if (offset + ImageModel.PAGE_SIZE < imagePage.imageSize) {
+          offset += ImageModel.PAGE_SIZE;
+          BEViewer.imageModel.setImageSelection(ForensicPath.getAdjustedPath(imagePage.pageForensicPath, offset));
         } else {
-          String sizeString = String.format(BEViewer.LONG_FORMAT, imageSize);
           WError.showError(
-                      "Already at end of path of size " + sizeString + ".",
-                      "BEViewer Image File address error", null);
+                      "Already at end of path, " + imageSize + ".",
+                      "BEViewer Image File pan error", null);
         }
       }
     });

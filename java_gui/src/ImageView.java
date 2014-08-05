@@ -1,10 +1,11 @@
+import java.io.File;
 import java.util.Vector;
 import java.util.Observer;
 import java.util.Observable;
 
 /**
  * The <code>ImageView</code> class provides image view from page bytes
- * formatted according to <code>ImageLine.LineFormat</code>  and from user highlights.
+ * formatted with user highlights.
  */
 
 public class ImageView implements CopyableLineInterface {
@@ -20,7 +21,6 @@ public class ImageView implements CopyableLineInterface {
 
   // cached state
   private ImageModel.ImagePage imagePage;
-//  private Vector<byte[]> featureHighlights = new Vector<byte[]>();
   private Vector<byte[]> userHighlights = new Vector<byte[]>(); // managed by this model
   private boolean highlightMatchCase;
 
@@ -28,13 +28,13 @@ public class ImageView implements CopyableLineInterface {
   private final Vector<ImageLine> lines = new Vector<ImageLine>();
 
   // input used to generate image view
-  private long pageStartAddress = 0;
+  private String pageForensicPath = "";
   private byte[] pageBytes = new byte[0];
   private boolean[] pageHighlightFlags = new boolean[0];
-  private String addressFormat = "%1$d";	// simple decimal
+  private boolean useHexPath = false;
   private ImageLine.LineFormat lineFormat = ImageLine.LineFormat.HEX_FORMAT;
   private int fontSize = 12;
-  
+
   // this output state allows listeners to know the type of the last change
   private ChangeType changeType = ChangeType.IMAGE_PAGE_CHANGED; // indicates fullest change
 
@@ -63,6 +63,9 @@ public class ImageView implements CopyableLineInterface {
         setUserHighlights(userHighlights, highlightMatchCase);
       }
     });
+
+    // initialize the ImageView model
+    setImagePage(imageModel.getImagePage());
   }
 
   /**
@@ -80,7 +83,7 @@ public class ImageView implements CopyableLineInterface {
   public static final class ChangeType {
     public static final ChangeType IMAGE_PAGE_CHANGED = new ChangeType("Image page changed");
     public static final ChangeType USER_HIGHLIGHT_CHANGED = new ChangeType("User highlight changed");
-    public static final ChangeType ADDRESS_FORMAT_CHANGED = new ChangeType("Address format changed");
+    public static final ChangeType FORENSIC_PATH_NUMERIC_BASE_CHANGED = new ChangeType("Forensic path numeric base changed");
     public static final ChangeType LINE_FORMAT_CHANGED = new ChangeType("Line format changed");
     public static final ChangeType FONT_SIZE_CHANGED = new ChangeType("Font size changed");
     private final String name;
@@ -99,18 +102,11 @@ public class ImageView implements CopyableLineInterface {
     this.imagePage = imagePage; // save for use with imageHighlightProducer.getPageHighlightFlags
 
     // set state that changes for this call
-    if (imagePage == null) {
-      // clear page values
-      pageStartAddress = 0;
-      pageBytes = new byte[0];
-      pageHighlightFlags = new boolean[0];
-    } else {
-      // set page values
-      pageStartAddress = imagePage.pageStartAddress;
-      pageBytes = imagePage.pageBytes;
-      pageHighlightFlags = imageHighlightProducer.getPageHighlightFlags(
+    // set page values
+    pageForensicPath = imagePage.pageForensicPath;
+    pageBytes = imagePage.pageBytes;
+    pageHighlightFlags = imageHighlightProducer.getPageHighlightFlags(
                               imagePage, userHighlights, highlightMatchCase);
-    }
 
     // make change
     setLines(ChangeType.IMAGE_PAGE_CHANGED);
@@ -130,31 +126,26 @@ public class ImageView implements CopyableLineInterface {
     // set state changes for this call
     this.userHighlights = userHighlights;
     this.highlightMatchCase = highlightMatchCase;
-    if (imagePage == null) {
-      // clear highlights
-      pageHighlightFlags = new boolean[0];
-    } else {
-      pageHighlightFlags = imageHighlightProducer.getPageHighlightFlags(
+    pageHighlightFlags = imageHighlightProducer.getPageHighlightFlags(
                               imagePage, userHighlights, highlightMatchCase);
-    }
 
     // make the changes
     setLines(ChangeType.USER_HIGHLIGHT_CHANGED);
   }
 
   /**
-   * Sets the address format associated with the currently active image.
+   * Sets the forensic path numeric base associated with the currently active image.
    */
-  public void setAddressFormat(String addressFormat) {
-    this.addressFormat = addressFormat;
-    setLines(ChangeType.ADDRESS_FORMAT_CHANGED);
+  public void setUseHexPath(boolean useHexPath) {
+    this.useHexPath = useHexPath;
+    setLines(ChangeType.FORENSIC_PATH_NUMERIC_BASE_CHANGED);
   }
 
   /**
-   * Returns the address format associated with the currently active image.
+   * Returns the forensic path numeric base associated with the currently active image.
    */
-  public String getAddressFormat() {
-    return addressFormat;
+  public boolean getUseHexPath() {
+    return useHexPath;
   }
 
   /**
@@ -213,12 +204,8 @@ public class ImageView implements CopyableLineInterface {
   }
 
   /**
-   * Sets the image line
-   * @param pageStartAddress the start address for generated feature lines
-   * @param pageBytes the bytes of the page
-   * @param pageHighlightFlags the highlight flags associated with the page bytes
-   * @param addressFormat the address format to use for printing offsets
-   * @param lineFormat the line format to use for creating the line text
+   * Recalculates the lines in the view.
+   * @param changeType the change type associated with this action
    */
   private void setLines(ChangeType changeType) {
 
@@ -242,12 +229,19 @@ public class ImageView implements CopyableLineInterface {
   private void setHexLines() {
     final int MAX_CHARS = 80;
 
+    // establish forensic path offset
+    long forensicPathOffset = ForensicPath.getOffset(pageForensicPath);
+
+    // establish width of widest forensic path field
+    String widestForensicPath = ForensicPath.getAdjustedPath(pageForensicPath, forensicPathOffset + ImageModel.PAGE_SIZE);
+    String printableWidestForensicPath = ForensicPath.getPrintablePath(widestForensicPath, useHexPath);
+
     // work through bytes, preparing image lines
-    int pageOffset;
+    int pageOffset; // start of page is 0
     for (pageOffset = 0; pageOffset < pageBytes.length; pageOffset += HEX_BYTES_PER_LINE) {
 
       // image line attributes to be prepared
-      final long lineStartAddress;
+      final String lineForensicPath;
       final String text;
       final int[] highlightIndexes = new int[MAX_CHARS];
       int numHighlights = 0;
@@ -255,20 +249,23 @@ public class ImageView implements CopyableLineInterface {
       // prepare this image line
       StringBuffer textBuffer = new StringBuffer(MAX_CHARS);
 
-      // determine the line's absolute byte offset from the start of the image
-      lineStartAddress = pageStartAddress + pageOffset;
+      // determine the line's forensic path based on the page offset
+      lineForensicPath = ForensicPath.getAdjustedPath(
+                           pageForensicPath, forensicPathOffset + pageOffset);
 
-      // format: long address, binary values where legal, hex values
+      // format: forensic path, binary values where legal, hex values
       // format: [00000000]00000000  ..fslfejl.......  00000000 00000000 00000000 00000000
 
-      // add the long address
-      try {
-        textBuffer.append(String.format(addressFormat, lineStartAddress));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
+      // add the forensic path
+      String printablePath = ForensicPath.getPrintablePath(lineForensicPath, useHexPath);
+      textBuffer.append(printablePath);
+
+      // tab out varying width
+      for (int tabCount = printablePath.length(); tabCount < printableWidestForensicPath.length(); tabCount++) {
+        textBuffer.append(" ");
       }
 
-      // add space
+      // add spacing between path and data
       textBuffer.append("  ");
 
       // add the ascii values
@@ -335,7 +332,7 @@ public class ImageView implements CopyableLineInterface {
       text = textBuffer.toString();
 
       // create the image line
-      ImageLine imageLine = new ImageLine(lineStartAddress, text, highlightIndexes, numHighlights);
+      ImageLine imageLine = new ImageLine(lineForensicPath, text, highlightIndexes, numHighlights);
       lines.add(imageLine);
     }
   }
@@ -343,53 +340,46 @@ public class ImageView implements CopyableLineInterface {
   /**
    * Returns the image line number containing the feature line given the line format.
    */
-  public int getFeatureLineIndex(FeatureLine featureLine) {
-    if (featureLine == null) {
-      return -1;
-    }
+  public int getForensicPathLineIndex(String forensicPath) {
 
-    // get index based on line format
+    // get bytes per line
+    int bytesPerLine;
     if (lineFormat == ImageLine.LineFormat.HEX_FORMAT) {
-      return getHexFeatureLineIndex(featureLine);
+      bytesPerLine = HEX_BYTES_PER_LINE;
     } else if (lineFormat == ImageLine.LineFormat.TEXT_FORMAT) {
-      return getTextFeatureLineIndex(featureLine);
+      bytesPerLine = TEXT_BYTES_PER_LINE;
     } else {
       throw new IllegalArgumentException();
     }
-  }
+    // get index based on line format
+    long pathOffset = ForensicPath.getOffset(forensicPath);
+    long pageOffset = ForensicPath.getOffset(pageForensicPath);
+    int imageLine = (int)((pathOffset - pageOffset) / bytesPerLine);
 
-  private int getHexFeatureLineIndex(FeatureLine featureLine) {
-    // identify the line number where the feature line's feature starts
-    long longFeatureLineIndex = (featureLine.getAddress() - pageStartAddress) / HEX_BYTES_PER_LINE;
-    return boundcheckFeatureLineIndex(longFeatureLineIndex);
-  }
-
-  private int getTextFeatureLineIndex(FeatureLine featureLine) {
-    // identify the line number where the feature line's feature starts
-    long longFeatureLineIndex = (featureLine.getAddress() - pageStartAddress) / TEXT_BYTES_PER_LINE;
-    return boundcheckFeatureLineIndex(longFeatureLineIndex);
-  }
-
-  private int boundcheckFeatureLineIndex(long longFeatureLineIndex) {
-    int featureLineIndex;
-    // set the feature line number, using -1 if it is out of range of the lines generated
-    if (longFeatureLineIndex < 0 || longFeatureLineIndex >= lines.size()) {
-      featureLineIndex = -1;
+    // normalize
+    if (imageLine < 0 || imageLine > lines.size()) {
+      return -1;
     } else {
-      featureLineIndex = (int)longFeatureLineIndex;
+      return imageLine;
     }
-    return featureLineIndex;
   }
 
   // generate lines in text view format
   private void setTextLines() {
+
+    // establish forensic path offset
+    long forensicPathOffset = ForensicPath.getOffset(pageForensicPath);
+
+    // establish width of widest forensic path field
+    String widestForensicPath = ForensicPath.getAdjustedPath(pageForensicPath, forensicPathOffset + ImageModel.PAGE_SIZE);
+    String printableWidestForensicPath = ForensicPath.getPrintablePath(widestForensicPath, useHexPath);
 
     // work through bytes, preparing image lines
     int pageOffset;
     for (pageOffset = 0; pageOffset < pageBytes.length; pageOffset += TEXT_BYTES_PER_LINE) {
 
       // image line attributes to be prepared
-      final long lineStartAddress;
+      final String lineForensicPath;
       final String text;
       final int[] highlightIndexes = new int[TEXT_BYTES_PER_LINE];
       int numHighlights = 0;
@@ -397,20 +387,23 @@ public class ImageView implements CopyableLineInterface {
       // prepare this image line
       StringBuffer textBuffer = new StringBuffer(TEXT_BYTES_PER_LINE);
 
-      // determine the line's absolute byte offset from the start of the image
-      lineStartAddress = pageStartAddress + pageOffset;
+      // determine the line's forensic path based on the page offset
+      lineForensicPath = ForensicPath.getAdjustedPath(pageForensicPath, forensicPathOffset + pageOffset);
 
-      // format: long address, binary values where legal
+
+      // format: forensic path, binary values where legal
       // format: [00000000]00000000  ..fslfejl.............................
 
-      // add the long address
-      try {
-        textBuffer.append(String.format(addressFormat, lineStartAddress));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
+      // add the forensic path
+      String printablePath = ForensicPath.getPrintablePath(lineForensicPath, useHexPath);
+      textBuffer.append(printablePath);
+
+      // tab out varying width
+      for (int tabCount = printablePath.length(); tabCount < printableWidestForensicPath.length(); tabCount++) {
+        textBuffer.append(" ");
       }
 
-      // add space
+      // add spacing between path and data
       textBuffer.append("  ");
 
       // add the ascii values
@@ -438,7 +431,7 @@ public class ImageView implements CopyableLineInterface {
       text = textBuffer.toString();
 
       // create the image line
-      ImageLine imageLine = new ImageLine(lineStartAddress, text, highlightIndexes, numHighlights);
+      ImageLine imageLine = new ImageLine(lineForensicPath, text, highlightIndexes, numHighlights);
       lines.add(imageLine);
     }
   }
