@@ -1,4 +1,4 @@
-bulk-extractor (1.5.1-0kali1) UNRELEASED; urgency=medium
+bulk-extractor (1.5.1-0kali1) kali-dev; urgency=medium
 
   * debian/watch updated because it didn't work.
   * New Uptream release 
