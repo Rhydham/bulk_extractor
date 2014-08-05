@@ -25,13 +25,9 @@ public class BEPreferences {
 
   // Defaults
   /**
-   * Default show shortcuts toolbar, {@value}.
+   * Default show toolbar, {@value}.
    */
-  public static final boolean DEFAULT_SHOW_SHORTCUTS_TOOLBAR = true;
-  /**
-   * Default show highlight toolbar, {@value}.
-   */
-  public static final boolean DEFAULT_SHOW_HIGHLIGHT_TOOLBAR = true;
+  public static final boolean DEFAULT_SHOW_TOOLBAR = true;
   /**
    * Default font size for Feature listing, {@value}.
    */
@@ -41,29 +37,9 @@ public class BEPreferences {
    */
   public static final int DEFAULT_IMAGE_FONT_SIZE = 12;
   /**
-   * Default decimal adress format for Feature listing, {@value}.
+   * Default forensic path numeric base hex, {@value}.
    */
-  public static final String FEATURE_ADDRESS_FORMAT_DECIMAL = "%1$5d";
-  /**
-   * Default hex address format for Feature listing, {@value}.
-   */
-  public static final String FEATURE_ADDRESS_FORMAT_HEX = "%1$08x";
-  /**
-   * Default address format for Feature listing, {@value}.
-   */
-  public static final String DEFAULT_FEATURE_ADDRESS_FORMAT = FEATURE_ADDRESS_FORMAT_DECIMAL;
-  /**
-   * Default decimal adress format for Image listing, {@value}.
-   */
-  public static final String IMAGE_ADDRESS_FORMAT_DECIMAL = "%1$5d";
-  /**
-   * Default hex adress format for Image listing, {@value}.
-   */
-  public static final String IMAGE_ADDRESS_FORMAT_HEX = "%1$08x";
-  /**
-   * Default adress format for Image listing, {@value}.
-   */
-  public static final String DEFAULT_IMAGE_ADDRESS_FORMAT = IMAGE_ADDRESS_FORMAT_DECIMAL;
+  public static final boolean DEFAULT_FORENSIC_PATH_NUMERIC_BASE_HEX = false;
   /**
    * Default format for presenting Image lines, {@value}.
    */
@@ -110,13 +86,9 @@ public class BEPreferences {
   // load user preferences saved locally from last run, if available, else load defaults
   public static void loadPreferences() {
 
-    // load preference to show the shortcuts toolbar
-    boolean showShortcutsToolbar = preferences.getBoolean("show_shortcuts_toolbar", DEFAULT_SHOW_SHORTCUTS_TOOLBAR);
-    BEViewer.shortcutsToolbar.setVisible(showShortcutsToolbar);
-
-    // load preference to show the highlight toolbar
-    boolean showHighlightToolbar = preferences.getBoolean("show_highlight_toolbar", DEFAULT_SHOW_HIGHLIGHT_TOOLBAR);
-    BEViewer.highlightToolbar.setVisible(showHighlightToolbar);
+    // load preference to show the toolbar
+    boolean showToolbar = preferences.getBoolean("show_toolbar", DEFAULT_SHOW_TOOLBAR);
+    BEViewer.toolbar.setVisible(showToolbar);
 
     // load feature font size
     int featureFontSize = preferences.getInt("feature_font_size", DEFAULT_FEATURE_FONT_SIZE);
@@ -127,23 +99,10 @@ public class BEPreferences {
     int imageFontSize = preferences.getInt("image_font_size", DEFAULT_IMAGE_FONT_SIZE);
     BEViewer.imageView.setFontSize(imageFontSize);
 
-    // load feature address format
-    String featureAddressFormat = preferences.get("feature_address_format", DEFAULT_FEATURE_ADDRESS_FORMAT);
-    // fix a corrupted value
-    if (featureAddressFormat != FEATURE_ADDRESS_FORMAT_DECIMAL
-     && featureAddressFormat != FEATURE_ADDRESS_FORMAT_HEX) {
-      featureAddressFormat = DEFAULT_FEATURE_ADDRESS_FORMAT;
-    }
-    BEViewer.featuresModel.setAddressFormat(featureAddressFormat);
-
-    // load image file address format
-    String imageAddressFormat = preferences.get("image_address_format", DEFAULT_IMAGE_ADDRESS_FORMAT);
-    // fix a corrupted value
-    if (imageAddressFormat != IMAGE_ADDRESS_FORMAT_DECIMAL
-     && imageAddressFormat != IMAGE_ADDRESS_FORMAT_HEX) {
-      imageAddressFormat = DEFAULT_IMAGE_ADDRESS_FORMAT;
-    }
-    BEViewer.imageView.setAddressFormat(imageAddressFormat);
+    // load forensic path numeric base
+    boolean forensicPathNumericBaseHex = preferences.getBoolean("forensic_path_numeric_base_hex", DEFAULT_FORENSIC_PATH_NUMERIC_BASE_HEX);
+    BEViewer.featuresModel.setUseHexPath(forensicPathNumericBaseHex);
+    BEViewer.imageView.setUseHexPath(forensicPathNumericBaseHex);
 
     // load the image line format, note that ImageLine.LineFormat establishes the default
     String imageLineFormat = preferences.get("image_line_format", DEFAULT_IMAGE_LINE_FORMAT);
@@ -183,20 +142,20 @@ public class BEPreferences {
       String reportIndex = Integer.toString(i);
       String featuresDirectoryString = reportsPreferences.get("feature_directory_" + reportIndex, null);
       File featuresDirectory = (featuresDirectoryString == null) ? null : new File(featuresDirectoryString);
-      String imageFileString = reportsPreferences.get("image_file_" + reportIndex, null);
-      File imageFile = (imageFileString == null) ? null : new File(imageFileString);
+      String reportImageFileString = reportsPreferences.get("image_file_" + reportIndex, null);
+      File reportImageFile = (reportImageFileString == null) ? null : new File(reportImageFileString);
 
       // stop loading reports when there are no more saved values
       if (featuresDirectory == null) {
         break;
       }
-      if (imageFile == null) {
-        WLog.log("BEPreferences: loadSavedReports: unexpected null imageFile");
+      if (reportImageFile == null) {
+        WLog.log("BEPreferences: loadSavedReports: unexpected null reportImageFile");
         break;
       }
 
       // load the saved report into the model
-      BEViewer.reportsModel.addReport(featuresDirectory, imageFile);
+      BEViewer.reportsModel.addReport(featuresDirectory, reportImageFile);
 
       // move to the next index
       i++;
@@ -210,15 +169,15 @@ public class BEPreferences {
     while (true) {
       // generate the preferences variable names
       String bookmarkIndex = Integer.toString(i);
-      String imageFileString = bookmarksPreferences.get("image_file_" + bookmarkIndex, null);
-      File imageFile = (imageFileString == null) ? null : new File(imageFileString);
+      String reportImageFileString = bookmarksPreferences.get("image_file_" + bookmarkIndex, null);
+      File reportImageFile = (reportImageFileString == null) ? null : new File(reportImageFileString);
       String featuresFileString = bookmarksPreferences.get("features_file_" + bookmarkIndex, null);
-      File featuresFile = (imageFileString == null) ? null : new File(featuresFileString);
+      File featuresFile = (reportImageFileString == null) ? null : new File(featuresFileString);
       long startByte = bookmarksPreferences.getLong("start_byte_" + bookmarkIndex, 0);
       int numBytes = bookmarksPreferences.getInt("num_bytes_" + bookmarkIndex, 0);
 
       // stop loading bookmarks when there are no more saved values
-//      if (imageFile == null) {
+//      if (reportImageFile == null) {
 //        break;
 //      }
       if (featuresFile == null) {
@@ -227,9 +186,9 @@ public class BEPreferences {
       }
 
       // warn if the image file does not exist
-      if (imageFile != null && !imageFile.exists()) {
+      if (reportImageFile != null && !reportImageFile.exists()) {
         WError.showError("The image file for the Feature being restored is not available:"
-                         + "\nImage file: " + imageFileString
+                         + "\nImage file: " + reportImageFileString
                          + "\nFeature file: " + featuresFileString
                          + "\nFeature index: " + startByte,
                          "BEViewer Preferences Error", null);
@@ -238,7 +197,7 @@ public class BEPreferences {
       // warn and skip if the feature file does not exist
       if (!featuresFile.exists()) {
         WError.showError("Unable to restore feature from saved preferences because the Feature file is not available:"
-                         + "\nImage file: " + imageFileString
+                         + "\nImage file: " + reportImageFileString
                          + "\nFeature file: " + featuresFileString
                          + "\nFeature index: " + startByte,
                          "BEViewer Preferences Error", null);
@@ -247,13 +206,13 @@ public class BEPreferences {
 
       // create the feature from the saved values
       try {
-        FeatureLine featureLine = new FeatureLine(imageFile, featuresFile, startByte, numBytes);
+        FeatureLine featureLine = new FeatureLine(reportImageFile, featuresFile, startByte, numBytes);
 
         // load the saved feature line bookmark into the Feature bookmarks model
-        BEViewer.featureBookmarksModel.addBookmark(featureLine);
+        BEViewer.bookmarksModel.addElement(featureLine);
       } catch (Exception e) {
         WError.showError("Unable to restore feature from saved preferences:"
-                         + "\nImage file: " + imageFileString
+                         + "\nImage file: " + reportImageFileString
                          + "\nFeature file: " + featuresFileString
                          + "\nFeature index: " + startByte,
                          "BEViewer Preferences Error", e);
@@ -267,11 +226,8 @@ public class BEPreferences {
   public static void savePreferences() {
     try {
 
-      // preference to show the shortcuts toolbar
-      preferences.putBoolean("show_shortcuts_toolbar", BEViewer.shortcutsToolbar.isVisible());
-
-      // preference to show the highlight toolbar
-      preferences.putBoolean("show_highlight_toolbar", BEViewer.highlightToolbar.isVisible());
+      // preference to show the toolbar
+      preferences.putBoolean("show_toolbar", BEViewer.toolbar.isVisible());
 
       // feature font size
       preferences.putInt("feature_font_size", BEViewer.featuresModel.getFontSize());
@@ -279,11 +235,8 @@ public class BEPreferences {
       // image file font size
       preferences.putInt("image_font_size", BEViewer.imageView.getFontSize());
 
-      // feature address format
-      preferences.put("feature_address_format", BEViewer.featuresModel.getAddressFormat());
-
-      // image address format
-      preferences.put("image_address_format", BEViewer.imageView.getAddressFormat());
+      // forensic path numeric base, the same for featuresModel and imageView
+      preferences.putBoolean("forensic_path_numeric_base_hex", BEViewer.featuresModel.getUseHexPath());
 
       // image line format
       preferences.put("image_line_format", BEViewer.imageView.getLineFormat().toString());
@@ -330,12 +283,12 @@ public class BEPreferences {
 
       // get the File strings
       String featuresDirectoryString = FileTools.getAbsolutePath(reportTreeNode.featuresDirectory);
-      String imageFileString = FileTools.getAbsolutePath(reportTreeNode.imageFile);
+      String reportImageFileString = FileTools.getAbsolutePath(reportTreeNode.reportImageFile);
 
       // save the indexed feature directory and image file preferences
       String reportIndex = Integer.toString(i);
       reportsPreferences.put("feature_directory_" + reportIndex, featuresDirectoryString);
-      reportsPreferences.put("image_file_" + reportIndex, imageFileString);
+      reportsPreferences.put("image_file_" + reportIndex, reportImageFileString);
 
       i++;
     }
@@ -349,20 +302,20 @@ public class BEPreferences {
     bookmarksPreferences.clear();
 
     // get number of bookmarks to save
-    int size = BEViewer.featureBookmarksModel.size();
+    int size = BEViewer.bookmarksModel.size();
 
     // save the bookmarks
     for (int i=0; i<size; i++) {
       // generate the preferences variable names
-      FeatureLine featureLine = BEViewer.featureBookmarksModel.get(i);
-      String imageFileString = FileTools.getAbsolutePath(featureLine.getImageFile());
-      String featuresFileString = FileTools.getAbsolutePath(featureLine.getFeaturesFile());
-      long startByte = featureLine.getStartByte();
-      int numBytes = featureLine.getNumBytes();
+      FeatureLine featureLine = BEViewer.bookmarksModel.get(i);
+      String reportImageFileString = FileTools.getAbsolutePath(featureLine.reportImageFile);
+      String featuresFileString = FileTools.getAbsolutePath(featureLine.featuresFile);
+      long startByte = featureLine.startByte;
+      int numBytes = featureLine.numBytes;
 
       // save the indexed feature line bookmark preferences
       String reportIndex = Integer.toString(i);
-      bookmarksPreferences.put("image_file_" + reportIndex, imageFileString);
+      bookmarksPreferences.put("image_file_" + reportIndex, reportImageFileString);
       bookmarksPreferences.put("features_file_" + reportIndex, featuresFileString);
       bookmarksPreferences.putLong("start_byte_" + reportIndex, startByte);
       bookmarksPreferences.putInt("num_bytes_" + reportIndex, numBytes);
@@ -398,36 +351,35 @@ public class BEPreferences {
 
         // get the File strings
         String featuresDirectoryString = FileTools.getAbsolutePath(reportTreeNode.featuresDirectory);
-        String imageFileString = FileTools.getAbsolutePath(reportTreeNode.imageFile);
+        String reportImageFileString = FileTools.getAbsolutePath(reportTreeNode.reportImageFile);
 
         // create the Report element
         Element report = doc.createElement("report");
 
         // set the feature file and image file strings
         report.setAttribute("feature_directory", featuresDirectoryString);
-        report.setAttribute("image_file", imageFileString);
+        report.setAttribute("image_file", reportImageFileString);
 
         // add the Report element to the work settings element
         workSettings.appendChild(report);
       }
 
       // fill the bookmark elements
-      // get the array of bookmarks to create
-      int numBookmarks = BEViewer.featureBookmarksModel.size();
+      int numBookmarks = BEViewer.bookmarksModel.size();
       for (int i=0; i<numBookmarks; i++) {
 
         // get the requisite bookmark attributes
-        FeatureLine featureLine = BEViewer.featureBookmarksModel.get(i);
-        String imageFileString = FileTools.getAbsolutePath(featureLine.getImageFile());
-        String featuresFileString = FileTools.getAbsolutePath(featureLine.getFeaturesFile());
-        String startByteString = Long.toString(featureLine.getStartByte());
-        String numBytesString = Integer.toString(featureLine.getNumBytes());
+        FeatureLine featureLine = BEViewer.bookmarksModel.get(i);
+        String reportImageFileString = FileTools.getAbsolutePath(featureLine.reportImageFile);
+        String featuresFileString = FileTools.getAbsolutePath(featureLine.featuresFile);
+        String startByteString = Long.toString(featureLine.startByte);
+        String numBytesString = Integer.toString(featureLine.numBytes);
 
         // create the Bookmark element
         Element bookmark = doc.createElement("bookmark");
 
         // set the bookmark attributes
-        bookmark.setAttribute("image_file", imageFileString);
+        bookmark.setAttribute("image_file", reportImageFileString);
         bookmark.setAttribute("feature_file", featuresFileString);
         bookmark.setAttribute("start_byte", startByteString);
         bookmark.setAttribute("num_bytes", numBytesString);
@@ -497,10 +449,10 @@ public class BEPreferences {
         // get the report files
         Element report = (Element)reportList.item(i);
         File featuresDirectory = new File(report.getAttribute("feature_directory"));
-        File imageFile = new File(report.getAttribute("image_file"));
+        File reportImageFile = new File(report.getAttribute("image_file"));
 
         // load the report into the model
-        BEViewer.reportsModel.addReport(featuresDirectory, imageFile);
+        BEViewer.reportsModel.addReport(featuresDirectory, reportImageFile);
       }
 
       // load Bookmarks
@@ -509,7 +461,7 @@ public class BEPreferences {
 
         // get the bookmark attributes
         Element bookmark = (Element)bookmarkList.item(i);
-        File imageFile = new File(bookmark.getAttribute("image_file"));
+        File reportImageFile = new File(bookmark.getAttribute("image_file"));
         File featuresFile = new File(bookmark.getAttribute("feature_file"));
         long startByte = Long.parseLong(bookmark.getAttribute("start_byte"));
         int numBytes = Integer.parseInt(bookmark.getAttribute("num_bytes"));
@@ -517,13 +469,13 @@ public class BEPreferences {
         // load the bookmark into the model
         // create the feature from the saved values
         try {
-          FeatureLine featureLine = new FeatureLine(imageFile, featuresFile, startByte, numBytes);
+          FeatureLine featureLine = new FeatureLine(reportImageFile, featuresFile, startByte, numBytes);
 
           // load the saved feature line bookmark into the Feature bookmarks model
-          BEViewer.featureBookmarksModel.addBookmark(featureLine);
+          BEViewer.bookmarksModel.addElement(featureLine);
         } catch (Exception e) {
           WError.showError("Unable to restore work settings feature:"
-                           + "\nImage file: " + imageFile
+                           + "\nReport Image file: " + reportImageFile
                            + "\nFeature file: " + featuresFile
                            + "\nFeature index: " + startByte,
                            "BEViewer Preferences Error", e);

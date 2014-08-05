@@ -5,8 +5,9 @@ import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import javax.swing.*;
 import java.util.Vector;
-import java.util.Enumeration;
+import java.util.Iterator;
 import java.io.IOException;
+import java.util.HashMap;
 
 /**
  * Manage the scanner selections (selected feature recorders).
@@ -15,9 +16,10 @@ import java.io.IOException;
 public class WScanBoxedScanners {
 
   /**
-   * this class contains a scanner: its command name, CheckBox, default value,
-   * and user's selected value.
+   * FeatureScanner contains UI and state for one scanner: its command name,
+   * CheckBox, default value, and user's selected value.
    */
+/*
   public static class FeatureScanner {
     final JCheckBox scannerCB;
     final boolean defaultUseScanner;
@@ -27,27 +29,15 @@ public class WScanBoxedScanners {
       scannerCB = new JCheckBox(command);
       this.command = command;
       this.defaultUseScanner = defaultUseScanner;
+//      this.useScanner = defaultUseScanner;
+      scannerCB.setSelected(useScanner);
     }
   }
-  public final static Vector<FeatureScanner> featureScanners = new Vector<FeatureScanner>();
-  static {
-    Vector<BulkExtractorScanListReader.Scanner> scanners;
-    try {
-      scanners = BulkExtractorScanListReader.readScanList();
-    } catch (IOException e) {
-      WError.showError("Error in obtaining list of scanners from bulk_extractor."
-                       + "\nBulk_extractor is not available during this session.",
-                         "bulk_extractor failure", e);
-      scanners = new Vector<BulkExtractorScanListReader.Scanner>();
-    }
-    for (Enumeration e = scanners.elements(); e.hasMoreElements();) {
-      BulkExtractorScanListReader.Scanner scanner =
-            (BulkExtractorScanListReader.Scanner)e.nextElement();
-      featureScanners.add(new FeatureScanner(scanner.command, scanner.defaultUseScanner));
-    }
-  }
+*/
 
-  public final Component component;
+  public static JPanel container = new JPanel();
+  public static Component component;
+  private static HashMap<String, JCheckBox> scannerMap = new HashMap<String, JCheckBox>();
 
   public WScanBoxedScanners() {
     component = buildContainer();
@@ -56,52 +46,68 @@ public class WScanBoxedScanners {
 
   private Component buildContainer() {
     // container using GridBagLayout with GridBagConstraints
-    JPanel container = new JPanel();
     container.setBorder(BorderFactory.createTitledBorder("Scanners"));
     container.setLayout(new GridBagLayout());
-    int y = 0;
-//    for (Enumeration<FeatureScanner> e = (Enumeration<FeatureScanner>)(featureScanners.elements()); e.hasMoreElements();); {
-    for (Enumeration e = featureScanners.elements(); e.hasMoreElements();) {
-      FeatureScanner featureScanner = (FeatureScanner)e.nextElement();
-      WScan.addOptionLine(container, y++, featureScanner.scannerCB);
-    }
-
+    setScannerList();
     return container;
   }
 
-  public void setDefaultValues() {
-    // Scanners (feature recorders)
-//    for (Enumeration<FeatureScanner> e = (Enumeration<FeatureScanner>)(featureScanners.elements()); e.hasMoreElements();); {
-    for (Enumeration e = featureScanners.elements(); e.hasMoreElements();) {
-      FeatureScanner featureScanner = (FeatureScanner)e.nextElement();
-      featureScanner.useScanner = featureScanner.defaultUseScanner;
+  // for each scanner from bulk_extractor, create the checkboxes
+  // and add a map to the checkboxes for future access
+  private static void setScannerList() {
+
+    // get the scanner list from bulk_extractor
+    Vector<BulkExtractorScanListReader.Scanner> scanners;
+    try {
+      scanners = BulkExtractorScanListReader.readScanList(
+              WScanBoxedControls.usePluginDirectoriesCB.isSelected(),
+              WScanBoxedControls.pluginDirectoriesTF.getText());
+    } catch (IOException e) {
+      WError.showError("Error in obtaining list of scanners from bulk_extractor."
+                     + "\nBulk_extractor is not available during this session."
+                     + "\nIs bulk_extractor installed?",
+                         "bulk_extractor failure", e);
+      scanners = new Vector<BulkExtractorScanListReader.Scanner>();
+    }
+
+    // add a JCheckBox to the container for each scanner
+    int y=0;
+    for (Iterator<BulkExtractorScanListReader.Scanner> it = scanners.iterator(); it.hasNext();) {
+      BulkExtractorScanListReader.Scanner scanner = it.next();
+
+      // add the checkbox to the container
+      JCheckBox checkBox = new JCheckBox(scanner.name);
+      WScan.addOptionLine(container, y++, checkBox);
+
+      // also add the checkbox to the scanner map
+      // for future access to its selection value
+      scannerMap.put(scanner.name, checkBox);
     }
   }
 
-  public void setUIValues() {
-    // Scanners (feature recorders)
-//    for (Enumeration<FeatureScanner> e = (Enumeration<FeatureScanner>)(featureScanners.elements()); e.hasMoreElements();); {
-    for (Enumeration e = featureScanners.elements(); e.hasMoreElements();) {
-      FeatureScanner featureScanner = (FeatureScanner)e.nextElement();
-      featureScanner.scannerCB.setSelected(featureScanner.useScanner);
+  public void setScanSettings(ScanSettings scanSettings) {
+
+    // iterate over scanSettings.scanners and set the corresponding
+    // selection state in the associated JCheckBox
+    for (Iterator<BulkExtractorScanListReader.Scanner> it = scanSettings.scanners.iterator(); it.hasNext();) {
+      BulkExtractorScanListReader.Scanner scanner = it.next();
+      JCheckBox checkbox = scannerMap.get(scanner.name);
+      checkbox.setSelected(scanner.useScanner);
     }
   }
 
-  public void getUIValues() {
-    // Scanners (feature recorders)
-//    for (Enumeration<FeatureScanner> e = (Enumeration<FeatureScanner>)(featureScanners.elements()); e.hasMoreElements();); {
-    for (Enumeration e = featureScanners.elements(); e.hasMoreElements();) {
-      FeatureScanner featureScanner = (FeatureScanner)e.nextElement();
-      featureScanner.useScanner = featureScanner.scannerCB.isSelected();
-    }
-  }
+  public void getScanSettings(ScanSettings scanSettings) {
 
-  public boolean validateValues() {
-    return true;
+    // iterate over scanSettings.scanners and get the selection state
+    // from the associated JCheckBox
+    for (Iterator<BulkExtractorScanListReader.Scanner> it = scanSettings.scanners.iterator(); it.hasNext();) {
+      BulkExtractorScanListReader.Scanner scanner = it.next();
+      JCheckBox checkbox = scannerMap.get(scanner.name);
+      scanner.useScanner = checkbox.isSelected();
+    }
   }
 
   private void wireActions() {
-    // Scanners (feature recorders)
     // no action
   }
 }

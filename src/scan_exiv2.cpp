@@ -5,8 +5,11 @@
  *                 - Added support for getting GPS information from photo and adding it to gps.txt
  */
 
-#include "bulk_extractor.h"
-#include "xml.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
+#include "be13_api/utils.h"
+
+#include "dfxml/src/dfxml_writer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -15,13 +18,15 @@
 #include <cassert>
 #include <algorithm>
 
-#include "md5.h"
+//#include "md5.h"
 
 #ifdef HAVE_EXIV2
 
 /* exiv2 has errors */
-#ifdef GNUC_HAS_DIAGNOSTIC_PRAGMA
+#ifdef HAVE_DIAGNOSTIC_SHADOW
 #pragma GCC diagnostic ignored "-Wshadow"
+#endif
+#ifdef HAVE_DIAGNOSTIC_EFFCPP
 #pragma GCC diagnostic ignored "-Weffc++"
 #endif
 
@@ -99,7 +104,7 @@ extern "C"
 void scan_exiv2(const class scanner_params &sp,const recursion_control_block &rcb)
 {
     assert(sp.sp_version==scanner_params::CURRENT_SP_VERSION);
-    if(sp.phase==scanner_params::startup){
+    if(sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
 	sp.info->name  = "exiv2";
         sp.info->author         = "Simson L. Garfinkel";
@@ -110,8 +115,8 @@ void scan_exiv2(const class scanner_params &sp,const recursion_control_block &rc
 	sp.info->flags = scanner_info::SCANNER_DISABLED; // disabled because we have be_exif
 	return;
     }
-    if(sp.phase==scanner_params::shutdown) return;
-    if(sp.phase==scanner_params::scan){
+    if(sp.phase==scanner_params::PHASE_SHUTDOWN) return;
+    if(sp.phase==scanner_params::PHASE_SCAN){
 
 	const sbuf_t &sbuf = sp.sbuf;
 	feature_recorder *exif_recorder = sp.fs.get_name("exif");
@@ -149,7 +154,8 @@ void scan_exiv2(const class scanner_params &sp,const recursion_control_block &rc
 			/*
 			 * Create the MD5 of the first 4K to use as a unique identifier.
 			 */
-			string md5_hex = sbuf.md5(pos,4096).hexdigest();
+			sbuf_t tohash(sbuf,0,4096);
+			string md5_hex = exif_recorder->fs.hasher.func(tohash.buf,tohash.bufsize);
 
 			char xmlbuf[1024];
 			snprintf(xmlbuf,sizeof(xmlbuf),
@@ -180,7 +186,7 @@ void scan_exiv2(const class scanner_params &sp,const recursion_control_block &rc
 			    if(i->count()>1000) continue;	// ignore long ones
 
 			    string key = string(i->key());
-			    xml.append("<"+key+">"+xml::xmlescape(i->value().toString())+"</"+key+">");
+			    xml.append("<"+key+">"+dfxml_writer::xmlescape(i->value().toString())+"</"+key+">");
 
                             // use Date from Photo unless date from GPS is available
 			    if(key=="Exif.Photo.DateTimeOriginal"){

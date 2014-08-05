@@ -1,6 +1,11 @@
 %{
 
-#include "utf8.h"
+#include "config.h"
+#include "be13_api/bulk_extractor_i.h"
+#include "histogram.h"
+#include "scan_ccns2.h"
+#include "sbuf_flex_scanner.h"
+
 
 /*
  * http://flex.sourceforge.net/manual/Cxx.html
@@ -11,28 +16,26 @@
  * http://en.wikipedia.org/wiki/List_of_Bank_Identification_Numbers
  */
 
-size_t min_phone_digits=6;
+size_t min_phone_digits=7;
+static int ssn_mode=0;
 
-#include "bulk_extractor.h"
-#include "scan_ccns2.h"
-
-#include "sbuf_flex_scanner.h"
 class accts_scanner : public sbuf_scanner {
 public:
 	accts_scanner(const scanner_params &sp):
 	  sbuf_scanner(&sp.sbuf),
-	  ccn_recorder(),ccn_track2(),telephone_recorder(),alert_recorder(){
-
-  	    ccn_recorder       = sp.fs.get_name("ccn");
-            telephone_recorder = sp.fs.get_name("telephone");
-    	    ccn_track2         = sp.fs.get_name("ccn_track2");
-    	    alert_recorder     = sp.fs.get_name(feature_recorder_set::ALERT_RECORDER);
+	  ccn_recorder(sp.fs.get_name("ccn")),
+          pii_recorder(sp.fs.get_name("pii")),
+          ccn_track2(sp.fs.get_name("ccn_track2")),
+          telephone_recorder(sp.fs.get_name("telephone")),
+          alert_recorder(sp.fs.get_alert_recorder()){
 	}
 
 	class feature_recorder *ccn_recorder;
+        class feature_recorder *pii_recorder;
 	class feature_recorder *ccn_track2;
 	class feature_recorder *telephone_recorder;
 	class feature_recorder *alert_recorder;
+
 };
 #define YY_EXTRA_TYPE accts_scanner *             /* holds our class pointer */
 YY_EXTRA_TYPE yyaccts_get_extra (yyscan_t yyscanner );    /* redundent declaration */
@@ -47,8 +50,29 @@ static bool has_min_digits(const char *buf)
    return digit_count>=min_phone_digits;
 }
 
-static string utf16to8(const wstring &s){
-string utf8_line;
+/*
+ * http://www.reddnet.net/regular-expression-for-validating-a-social-security-number-ssn-issued-after-june-25-2011/
+ * http://www.ssa.gov/employer/randomization.html
+ */
+static bool valid_ssn(const std::string &ssn)
+{
+   std::string nums;
+   /* Extract the digits */
+   for(int i=0;i<ssn.size();i++){
+      nums.push_back(ssn.at(i));
+   }
+   /* Apply the new validation rules */
+   if(nums.size()!=9) return false;
+   if(nums.substr(0,3)=="000") return false;
+   if(nums.substr(3,2)=="00") return false;
+   if(nums.substr(5,4)=="0000") return false;
+   if(nums.substr(0,3)=="666") return false;
+   if(nums[0]=='9') return false;
+   return true;
+}
+
+static std::string utf16to8(const std::wstring &s){
+std::string utf8_line;
 	try {
 	    utf8::utf16to8(s.begin(),s.end(),back_inserter(utf8_line));
 	} catch(utf8::invalid_utf16){
@@ -56,10 +80,16 @@ string utf8_line;
 	    utf8_line = "";
 	}
 	return utf8_line;
-    }
+}
+
+bool is_fbid(const sbuf_t &sbuf, size_t loc) {
+     if (loc>5 && sbuf.substr(loc-5,5)=="fbid=") return true;
+     return false;
+}
+
+#define SCANNER "scan_acct"
 %}
 
-%option reentrant
 %option noyywrap
 %option 8bit
 %option batch
@@ -74,6 +104,8 @@ DELIM	 ([- ])
 DB	({BLOCK}{DELIM})
 SDB	([45][0-9][0-9][0-9]{DELIM})
 TDEL	([ /.-])
+BASEEF  ([123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz])
+XBASEF  ([^123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz])
 
 PHONETEXT ([^a-z](tel[.ephon]*|(fax)|(facsimile)|DSN|telex|TTD|mobile|cell)):?
 
@@ -93,6 +125,14 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
 
 %%
 
+[^0-9a-z][13]({BASEEF}{27,34})/{XBASEF} {
+    accts_scanner &s = *yyaccts_get_extra(yyscanner);
+    if(valid_bitcoin_address(yytext+1,yyleng-1)){
+       s.pii_recorder->write_buf(SBUF,s.pos+1,yyleng-1);       
+    }
+    s.pos += yyleng;
+}
+
 [^0-9a-z]{DB}{DB}{DB}{DB}{DB} {
     /* #### #### #### #### #### #### is definately not a CCN. */
     /* REGEX1 */
@@ -105,7 +145,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
     /* #### #### #### #### --- most credit card numbers*/
     /* don't include the non-numeric character in the hand-off */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    if(validate_ccn(yytext+1,yyleng-1)){
+    if(valid_ccn(yytext+1,yyleng-1)){
         s.ccn_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
     }	
     s.pos += yyleng;
@@ -116,7 +156,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
     /* REGEX3 */
     /* Must be american express... */ 
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    if(validate_ccn(yytext+1,yyleng-1)){
+    if(valid_ccn(yytext+1,yyleng-1)){
         s.ccn_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
     }	
     s.pos += yyleng;
@@ -127,21 +167,21 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
     /* REGEX4 */
     /* Must be american express... */ 
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    if(validate_ccn(yytext+1,yyleng-1)){
+    if(valid_ccn(yytext+1,yyleng-1) && !is_fbid(SBUF,s.pos+1) ){
         s.ccn_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
     }	
     s.pos += yyleng;
 }
 
-[^0-9a-z\.][4-6]([0-9]{15,18})/{END} {
+[^0-9a-z\.][3-6]([0-9]{15,18})/{END} {
     /* REGEX5 */
-    /* ###############  13-19 numbers as a block beginning with a 4 or 5
+    /* ###############  13-19 numbers as a block beginning with a 3, 4, 5 or 6.
      * followed by something that is not a digit.
      * Yes, CCNs can now be up to 19 digits long. 
      * http://www.creditcards.com/credit-card-news/credit-card-appearance-1268.php
      */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    if(validate_ccn(yytext+1,yyleng-1)){
+    if(valid_ccn(yytext+1,yyleng-1) && !is_fbid(SBUF,s.pos+1)){
         s.ccn_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
     }	
     s.pos += yyleng;
@@ -153,7 +193,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
     /* ;CCN=05061010000000000738? */
     /* REGEX6 */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    if(validate_ccn(yytext+1,16)){  /* validate the first 16 digits */
+    if(valid_ccn(yytext+1,16)){  /* validate the first 16 digits */
     	s.ccn_track2->write_buf(SBUF,s.pos+1,yyleng-1);
     }
     s.pos += yyleng;
@@ -167,7 +207,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
      * PDF files.
      */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    if(validate_phone(SBUF,s.pos+1,yyleng-1)){
+    if(valid_phone(SBUF,s.pos+1,yyleng-1)){
        s.telephone_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
     }
     s.pos += yyleng;
@@ -186,7 +226,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
     /* Generalized international phone numbers */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
     if(has_min_digits(yytext)){
-        if(validate_phone(SBUF,s.pos+1,yyleng-1)){
+        if(valid_phone(SBUF,s.pos+1,yyleng-1)){
             s.telephone_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
         }
     }
@@ -197,7 +237,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
     /* REGEX10 */
     /* Generalized number with prefix */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    s.telephone_recorder->write_buf(SBUF,s.pos+1,yyleng);
+    s.telephone_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
     s.pos += yyleng;
 }
 
@@ -218,7 +258,7 @@ DATEFORMAT	({DATEA}|{DATEB}|{DATEC}|{DATED})
 \0((([0-9]\0){6}-\0){7}(([0-9]\0){6}))/[^0-9] {
     /* Make a wstring from yytext+1 to yyleng */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    wstring stmp;
+    std::wstring stmp;
     for(size_t i=1;i+1<(size_t)yyleng;i+=2){
        stmp.push_back(yytext[i] | (yytext[i+1]<<8));
     }
@@ -231,21 +271,41 @@ fedex[^a-z]+[0-9][0-9][0-9][0-9][- ]?[0-9][0-9][0-9][0-9][- ]?[0-9]/{END}	{
     /* REGEX12 */
     /* Generalized international phone numbers */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    s.ccn_recorder->write_buf(SBUF,s.pos,yyleng);
+    s.pii_recorder->write_buf(SBUF,s.pos,yyleng);
     s.pos += yyleng;
 }
 
-ssn:?[ \t]+[0-9][0-9][0-9]-?[0-9][0-9]-?[0-9][0-9][0-9][0-9]/{END}	{
+ssn:?[ \t]*[0-9][0-9][0-9]-?[0-9][0-9]-?[0-9][0-9][0-9][0-9]/{END}	{
     /* REGEX13 */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    s.ccn_recorder->write_buf(SBUF,s.pos,yyleng);
+    s.pii_recorder->write_buf(SBUF,s.pos,yyleng);
+    s.pos += yyleng;
+}
+
+[^0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]/{END}	{
+    /* REGEX13 --- SSNs without the SSN prefix, ssn_mode > 0*/
+    accts_scanner &s = *yyaccts_get_extra(yyscanner);
+    if(ssn_mode>0){
+        s.pii_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
+    }
+    s.pos += yyleng;
+}
+
+[^0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/{END} {
+    /* REGEX13 --- SSNs without the SSN prefix, with no dashes, ssn_mode > 0
+     * basically, these are just 10 digit numbers...
+     */
+    accts_scanner &s = *yyaccts_get_extra(yyscanner);
+    if(ssn_mode>1){
+        s.pii_recorder->write_buf(SBUF,s.pos+1,yyleng-1);
+    }
     s.pos += yyleng;
 }
 
 dob:?[ \t]+{DATEFORMAT}	{
     /* REGEX14 */
     accts_scanner &s = *yyaccts_get_extra(yyscanner);
-    s.ccn_recorder->write_buf(SBUF,s.pos,yyleng);
+    s.pii_recorder->write_buf(SBUF,s.pos,yyleng);
     s.pos += yyleng;
 }
 
@@ -265,6 +325,13 @@ box[ ]?[\[][0-9 -]{0,40}[\]] {
     s.pos += yyleng;
 }
 
+CT[.](Send|Receive)[.]CMD_([A-Z0-9_]{4,25})[ ]From=([0-9]{2,12}+)(([ ]To=([0-9]{2,12}+))?) {
+    /* TeamViewer */
+    accts_scanner &s = *yyaccts_get_extra(yyscanner);
+    s.pii_recorder->write_buf(SBUF,s.pos,yyleng);
+    s.pos += yyleng;
+}    
+
 .|\n { 
      /**
       * The no-match rule.
@@ -281,28 +348,43 @@ extern "C"
 void scan_accts(const class scanner_params &sp,const recursion_control_block &rcb)
 {
     assert(sp.sp_version==scanner_params::CURRENT_SP_VERSION);      
-    if(sp.phase==scanner_params::startup){
+    if(sp.phase==scanner_params::PHASE_STARTUP){
         assert(sp.info->si_version==scanner_info::CURRENT_SI_VERSION);
 	sp.info->name  = "accts";
 	sp.info->author		= "Simson L. Garfinkel";
 	sp.info->description	= "scans for CCNs, track 2, and phone #s";
 	sp.info->scanner_version= "1.0";
         sp.info->feature_names.insert("ccn");
+        sp.info->feature_names.insert("pii");  // personally identifiable information
         sp.info->feature_names.insert("ccn_track2");
         sp.info->feature_names.insert("telephone");
-        sp.info->feature_names.insert(feature_recorder_set::ALERT_RECORDER);
 	sp.info->histogram_defs.insert(histogram_def("ccn","","histogram"));
 	sp.info->histogram_defs.insert(histogram_def("ccn_track2","","histogram"));
 	sp.info->histogram_defs.insert(histogram_def("telephone","","histogram",HistogramMaker::FLAG_NUMERIC));
+        sp.info->histogram_defs.insert(histogram_def("pii","CT.*CMD_.*((From|To)=[0-9]+)","teamviewer",HistogramMaker::FLAG_NUMERIC));
+        sp.info->get_config("ssn_mode",&ssn_mode,"0=Normal; 1=No `SSN' required; 2=No dashes required");
+        sp.info->get_config("min_phone_digits",&min_phone_digits,"Min. digits required in a phone");
+        scan_ccns2_debug = sp.info->config->debug;           // get debug value
+        build_unbase58();
 	return;
     }
-    if(sp.phase==scanner_params::scan){
+    if(sp.phase==scanner_params::PHASE_SCAN){
         accts_scanner lexer(sp);
 	yyscan_t scanner;
         yyaccts_lex_init(&scanner);
 	yyaccts_set_extra(&lexer,scanner);
-	yyaccts_lex(scanner);
+        try {
+            yyaccts_lex(scanner);
+        }
+        catch (sbuf_scanner::sbuf_scanner_exception *e ) {
+            std::cerr << "Scanner " << SCANNER << "Exception " << e->what() << " processing " << sp.sbuf.pos0 << "\n";
+            delete e;
+        }
+                
         yyaccts_lex_destroy(scanner);
-	(void)yyunput;			// avoids defined but not used
+    }
+    if(sp.phase==scanner_params::PHASE_NONE){                 // avoids defined but not used
+	(void)yyunput;			
+        (void)yy_fatal_error;
     }
 }

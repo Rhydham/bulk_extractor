@@ -10,24 +10,7 @@ import javax.swing.*;
  */
 public class WScanBoxedDebugging {
 
-  // defaults
-  private static final int DEFAULT_MAX_RECURSION_DEPTH = 5;
-  private static final int DEFAULT_START_ON_PAGE_NUMBER = 0;
-  private static final int DEFAULT_START_AT_OFFSET = 0;
-  private static final int DEFAULT_DEBUG_NUMBER = 1;
-
-  // Debugging
-  public boolean useMaxRecursionDepth;
-  public int maxRecursionDepth;
-  public boolean useStartOnPageNumber;
-  public int startOnPageNumber;
-  public boolean useDebugNumber;
-  public int debugNumber;
-  public boolean useEraseOutputDirectory;
-
   public final Component component;
-  private final JCheckBox useMaxRecursionDepthCB = new JCheckBox("Maximum Recursion Depth");
-  private final JTextField maxRecursionDepthTF = new JTextField();
   private final JCheckBox useStartOnPageNumberCB = new JCheckBox("Start on Page Number");
   private final JTextField startOnPageNumberTF = new JTextField();
   private final JCheckBox useDebugNumberCB = new JCheckBox("Use Debug Mode Number");
@@ -45,7 +28,6 @@ public class WScanBoxedDebugging {
     container.setBorder(BorderFactory.createTitledBorder("Debugging Options"));
     container.setLayout(new GridBagLayout());
     int y = 0;
-    WScan.addOptionalTextLine(container, y++, useMaxRecursionDepthCB, maxRecursionDepthTF, WScan.NARROW_FIELD_WIDTH);
     WScan.addOptionalTextLine(container, y++, useStartOnPageNumberCB, startOnPageNumberTF, WScan.WIDE_FIELD_WIDTH);
     WScan.addOptionalTextLine(container, y++, useDebugNumberCB, debugNumberTF, WScan.NARROW_FIELD_WIDTH);
     WScan.addOptionLine(container, y++, useEraseOutputDirectoryCB);
@@ -53,58 +35,38 @@ public class WScanBoxedDebugging {
     return container;
   }
 
-  public void setDefaultValues() {
+  public void setScanSettings(ScanSettings scanSettings) {
     // Debugging
-    useMaxRecursionDepth = false;
-    maxRecursionDepth = DEFAULT_MAX_RECURSION_DEPTH;
-    useStartOnPageNumber = false;
-    startOnPageNumber = DEFAULT_START_ON_PAGE_NUMBER;
-    useDebugNumber = false;
-    debugNumber = DEFAULT_DEBUG_NUMBER;
-    useEraseOutputDirectory = false;
+    useStartOnPageNumberCB.setSelected(scanSettings.useStartOnPageNumber);
+    startOnPageNumberTF.setEnabled(scanSettings.useStartOnPageNumber);
+    startOnPageNumberTF.setText(scanSettings.startOnPageNumber);
+    useDebugNumberCB.setSelected(scanSettings.useDebugNumber);
+    debugNumberTF.setEnabled(scanSettings.useDebugNumber);
+    debugNumberTF.setText(scanSettings.debugNumber);
+    useEraseOutputDirectoryCB.setSelected(scanSettings.useEraseOutputDirectory);
   }
 
-  public void setUIValues() {
+  public void getScanSettings(ScanSettings scanSettings) {
     // Debugging
-    useMaxRecursionDepthCB.setSelected(useMaxRecursionDepth);
-    maxRecursionDepthTF.setEnabled(useMaxRecursionDepth);
-    maxRecursionDepthTF.setText(Integer.toString(maxRecursionDepth));
-    useStartOnPageNumberCB.setSelected(useStartOnPageNumber);
-    startOnPageNumberTF.setEnabled(useStartOnPageNumber);
-    startOnPageNumberTF.setText(Integer.toString(startOnPageNumber));
-    useDebugNumberCB.setSelected(useDebugNumber);
-    debugNumberTF.setEnabled(useDebugNumber);
-    debugNumberTF.setText(Integer.toString(debugNumber));
-    useEraseOutputDirectoryCB.setSelected(useEraseOutputDirectory);
-  }
-
-  public void getUIValues() {
-    // Debugging
-    useMaxRecursionDepth = useMaxRecursionDepthCB.isSelected();
-    maxRecursionDepth = WScan.getInt(maxRecursionDepthTF, "maximum recursion depth", DEFAULT_MAX_RECURSION_DEPTH);
-    useStartOnPageNumber = useStartOnPageNumberCB.isSelected();
-    startOnPageNumber = WScan.getInt(startOnPageNumberTF, "start on page number", DEFAULT_START_ON_PAGE_NUMBER);
-    useDebugNumber = useDebugNumberCB.isSelected();
-    debugNumber = WScan.getInt(debugNumberTF, "debug mode number", DEFAULT_DEBUG_NUMBER);
-    useEraseOutputDirectory = useEraseOutputDirectoryCB.isSelected();
-  }
-
-  public boolean validateValues() {
-    return true;
+    scanSettings.useStartOnPageNumber = useStartOnPageNumberCB.isSelected();
+    scanSettings.startOnPageNumber = startOnPageNumberTF.getText();
+    scanSettings.useDebugNumber = useDebugNumberCB.isSelected();
+    scanSettings.debugNumber = debugNumberTF.getText();
+    scanSettings.useEraseOutputDirectory = useEraseOutputDirectoryCB.isSelected();
   }
 
   // the sole purpose of this listener is to keep UI widget visibility up to date
   private class GetUIValuesActionListener implements ActionListener {
     public void actionPerformed(ActionEvent e) {
-      getUIValues();
-      setUIValues();
+      ScanSettings scanSettings = new ScanSettings();
+      getScanSettings(scanSettings);
+      setScanSettings(scanSettings);
     }
   }
 
   private void wireActions() {
     // Debugging
     GetUIValuesActionListener getUIValuesActionListener = new GetUIValuesActionListener();
-    useMaxRecursionDepthCB.addActionListener(getUIValuesActionListener);
     useStartOnPageNumberCB.addActionListener(getUIValuesActionListener);
     useDebugNumberCB.addActionListener(getUIValuesActionListener);
     useEraseOutputDirectoryCB.addActionListener(getUIValuesActionListener);

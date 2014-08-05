@@ -17,18 +17,6 @@ public class WScanBoxedGeneral {
 
   public final Component component;
 
-  // general options
-  public boolean useBannerFile;
-  public String bannerFile;
-  public boolean useAlertlistFile;
-  public String alertlistFile;
-  public boolean useStoplistFile;
-  public String stoplistFile;
-  public boolean useFindRegexTextFile;
-  public String findRegexTextFile;
-  public boolean useFindRegexText;
-  public String findRegexText;
-
   private final JCheckBox useBannerFileCB = new JCheckBox("Use Banner File");
   private final JTextField bannerFileTF = new JTextField();
   private final JButton bannerFileChooserB = new FileChooserButton(WScan.getWScanWindow(), "Select Banner File", FileChooserButton.READ_FILE, bannerFileTF);
@@ -43,6 +31,8 @@ public class WScanBoxedGeneral {
   private final JButton findRegexTextFileChooserB= new FileChooserButton(WScan.getWScanWindow(), "Select Find Regex Text File", FileChooserButton.READ_FILE, findRegexTextFileTF);
   private final JCheckBox useFindRegexTextCB = new JCheckBox("Use Find Regex Text");
   private final JTextField findRegexTextTF = new JTextField();
+  private final JCheckBox useRandomSamplingCB = new JCheckBox("Use Random Sampling");
+  private final JTextField randomSamplingTF = new JTextField();
 
   public WScanBoxedGeneral() {
     component = buildContainer();
@@ -60,75 +50,68 @@ public class WScanBoxedGeneral {
     WScan.addOptionalFileLine(container, y++, useStoplistFileCB, stoplistFileTF, stoplistFileChooserB);
     WScan.addOptionalFileLine(container, y++, useFindRegexTextFileCB, findRegexTextFileTF,
                                         findRegexTextFileChooserB);
-    WScan.addOptionalTextLine(container, y++, useFindRegexTextCB, findRegexTextTF, WScan.WIDE_FIELD_WIDTH);
+    WScan.addOptionalTextLine(container, y++, useFindRegexTextCB, findRegexTextTF, WScan.EXTRA_WIDE_FIELD_WIDTH);
+    WScan.addOptionalTextLine(container, y++, useRandomSamplingCB, randomSamplingTF, WScan.WIDE_FIELD_WIDTH);
+
+    // tool tip text
+    useRandomSamplingCB.setToolTipText("Random Sampling in form frac[:passes]");
 
     return container;
   }
 
-  public void setDefaultValues() {
+  public void setScanSettings(ScanSettings scanSettings) {
     // general options
-    useBannerFile = false;
-    bannerFile = "";
-    useAlertlistFile = false;
-    alertlistFile = "";
-    useStoplistFile = false;
-    stoplistFile = "";
-    useFindRegexTextFile = false;
-    findRegexTextFile = "";
-    useFindRegexText = false;
-    findRegexText = "";
+    useBannerFileCB.setSelected(scanSettings.useBannerFile);
+    bannerFileTF.setEnabled(scanSettings.useBannerFile);
+    bannerFileTF.setText(scanSettings.bannerFile);
+    bannerFileChooserB.setEnabled(scanSettings.useBannerFile);
+
+    useAlertlistFileCB.setSelected(scanSettings.useAlertlistFile);
+    alertlistFileTF.setEnabled(scanSettings.useAlertlistFile);
+    alertlistFileTF.setText(scanSettings.alertlistFile);
+    alertlistFileChooserB.setEnabled(scanSettings.useAlertlistFile);
+
+    useStoplistFileCB.setSelected(scanSettings.useStoplistFile);
+    stoplistFileTF.setEnabled(scanSettings.useStoplistFile);
+    stoplistFileTF.setText(scanSettings.stoplistFile);
+    stoplistFileChooserB.setEnabled(scanSettings.useStoplistFile);
+
+    useFindRegexTextFileCB.setSelected(scanSettings.useFindRegexTextFile);
+    findRegexTextFileTF.setEnabled(scanSettings.useFindRegexTextFile);
+    findRegexTextFileTF.setText(scanSettings.findRegexTextFile);
+    findRegexTextFileChooserB.setEnabled(scanSettings.useFindRegexTextFile);
+
+    useFindRegexTextCB.setSelected(scanSettings.useFindRegexText);
+    findRegexTextTF.setEnabled(scanSettings.useFindRegexText);
+    findRegexTextTF.setText(scanSettings.findRegexText);
+
+    useRandomSamplingCB.setSelected(scanSettings.useRandomSampling);
+    randomSamplingTF.setEnabled(scanSettings.useRandomSampling);
+    randomSamplingTF.setText(scanSettings.randomSampling);
   }
 
-  public void setUIValues() {
+  public void getScanSettings(ScanSettings scanSettings) {
     // general options
-    useBannerFileCB.setSelected(useBannerFile);
-    bannerFileTF.setEnabled(useBannerFile);
-    bannerFileTF.setText(bannerFile);
-    bannerFileChooserB.setEnabled(useBannerFile);
-
-    useAlertlistFileCB.setSelected(useAlertlistFile);
-    alertlistFileTF.setEnabled(useAlertlistFile);
-    alertlistFileTF.setText(alertlistFile);
-    alertlistFileChooserB.setEnabled(useAlertlistFile);
-
-    useStoplistFileCB.setSelected(useStoplistFile);
-    stoplistFileTF.setEnabled(useStoplistFile);
-    stoplistFileTF.setText(stoplistFile);
-    stoplistFileChooserB.setEnabled(useStoplistFile);
-
-    useFindRegexTextFileCB.setSelected(useFindRegexTextFile);
-    findRegexTextFileTF.setEnabled(useFindRegexTextFile);
-    findRegexTextFileTF.setText(findRegexTextFile);
-    findRegexTextFileChooserB.setEnabled(useFindRegexTextFile);
-
-    useFindRegexTextCB.setSelected(useFindRegexText);
-    findRegexTextTF.setEnabled(useFindRegexText);
-    findRegexTextTF.setText(findRegexText);
-  }
-
-  public void getUIValues() {
-    // general options
-    useBannerFile = useBannerFileCB.isSelected();
-    bannerFile = bannerFileTF.getText();
-    useAlertlistFile = useAlertlistFileCB.isSelected();
-    alertlistFile = alertlistFileTF.getText();
-    useStoplistFile = useStoplistFileCB.isSelected();
-    stoplistFile = stoplistFileTF.getText();
-    useFindRegexTextFile = useFindRegexTextFileCB.isSelected();
-    findRegexTextFile = findRegexTextFileTF.getText();
-    useFindRegexText = useFindRegexTextCB.isSelected();
-    findRegexText = findRegexTextTF.getText();
-  }
-
-  public boolean validateValues() {
-    return true;
+    scanSettings.useBannerFile = useBannerFileCB.isSelected();
+    scanSettings.bannerFile = bannerFileTF.getText();
+    scanSettings.useAlertlistFile = useAlertlistFileCB.isSelected();
+    scanSettings.alertlistFile = alertlistFileTF.getText();
+    scanSettings.useStoplistFile = useStoplistFileCB.isSelected();
+    scanSettings.stoplistFile = stoplistFileTF.getText();
+    scanSettings.useFindRegexTextFile = useFindRegexTextFileCB.isSelected();
+    scanSettings.findRegexTextFile = findRegexTextFileTF.getText();
+    scanSettings.useFindRegexText = useFindRegexTextCB.isSelected();
+    scanSettings.findRegexText = findRegexTextTF.getText();
+    scanSettings.useRandomSampling = useRandomSamplingCB.isSelected();
+    scanSettings.randomSampling = randomSamplingTF.getText();
   }
 
   // the sole purpose of this listener is to keep UI widget visibility up to date
   private class GetUIValuesActionListener implements ActionListener {
     public void actionPerformed(ActionEvent e) {
-      getUIValues();
-      setUIValues();
+      ScanSettings scanSettings = new ScanSettings();
+      getScanSettings(scanSettings);
+      setScanSettings(scanSettings);
     }
   }
 
@@ -140,6 +123,7 @@ public class WScanBoxedGeneral {
     useStoplistFileCB.addActionListener(getUIValuesActionListener);
     useFindRegexTextFileCB.addActionListener(getUIValuesActionListener);
     useFindRegexTextCB.addActionListener(getUIValuesActionListener);
+    useRandomSamplingCB.addActionListener(getUIValuesActionListener);
   }
 }
 

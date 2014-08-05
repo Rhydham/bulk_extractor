@@ -163,6 +163,19 @@ dig::const_iterator & operator++(dig::const_iterator &it)
 	if(stat(pathname.c_str(),&st)){
 	    continue;			// can't stat it
 	}
+        if(S_ISFIFO(st.st_mode)) {      // don't process FIFOs
+            continue;                   // 
+        }
+        if(S_ISSOCK(st.st_mode)) {      // don't process sockets
+            continue;                   // 
+        }
+        if(S_ISBLK(st.st_mode)) {      // don't process block devices
+            continue;                   // 
+        }
+        if(S_ISCHR(st.st_mode)) {      // don't process character devices
+            continue;                   // 
+        }
+
 #endif
 	dig::const_iterator::devinode di(st.st_dev,st.st_ino);
 	
@@ -203,13 +216,14 @@ static std::wstring utf8to16(const std::string &fn8)
     utf8::utf8to16(fn8.begin(),fn8.end(),back_inserter(fn16));
     return fn16;
 }
+#if 0
 static std::string utf16to8(const std::wstring &fn16)
 {
     std::string fn8;
     utf8::utf16to8(fn16.begin(),fn16.end(),back_inserter(fn8));
     return fn8;
 }
-
+#endif
 
 dig::dig(const std::string &start_):start(utf8to16(start_))
 {

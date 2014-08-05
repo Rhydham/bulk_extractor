@@ -1,4 +1,398 @@
+2014-08-03  Basic  <simsong@r4.ncr.nps.edu>
+
+	* configure.ac: incremented version number
+
+2014-07-18  Basic  <simsong@r4.ncr.nps.edu>
+
+	* src/image_process.cpp: multi-split files was not working properly on Windows. Fixed
+
+2014-07-17  Basic  <simsong@r4.ncr.nps.edu>
+
+	* src/scan_rar.cpp (scan_rar): fixed typo. raw_find_volume becomes rar_find_volume
+
+2014-05-17  Basic  <simsong@Dance.local>
+
+	* src/scan_base16.flex (public): fixed decoder so that what is decoded is a child sbuf with a specific offset and length
+
+2014-04-17  Basic  <simsong@r4.ncr.nps.edu>
+
+	* src/be13_api/feature_recorder.cpp (hexval): fixed hexval(); it was not working properly for letters A through F. (I wrote this myself becuase it isn't present on mingw.)
+
+2014-04-15  Basic  <simsong@r3.ncr.nps.edu>
+
+	* src/be13_api/feature_recorder.h (f): several of the flags were the same, resulting in behavior that was incorrect.
+
+2014-04-03  Basic  <simsong@Dance.local>
+
+	* src/be13_api/feature_recorder_set.cpp (feature_recorder_set::unset_flag): changed clear_flag to unset_flag for consistency.
+
+2014-04-02  Basic  <simsong@Dance.local>
+
+	* bugfix: featurefiles for carved elements no longer include the name of the -o directory.
+
+2014-02-25  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/scan_vcard.cpp (scan_vcard): removed     string myString;
+
+
+2014-01-26  Basic  <simsong@Dance.local>
+
+	* src/image_process.h (class process_dir): changed blocks() to max_blocks().
+
+2014-01-10  Basic  <simsong@t193-251.demo.tuwien.ac.at>
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::dump_histogram): moved regex into histogram_def so that it could be run in write(), rather than in post-processing. 
+
+2014-01-07  Basic  <simsong@Dance.local>
+
+	* src/be13_api/feature_recorder.h (class feature_recorder): removed outdir and input_fname from feature_recorder, since they are in the feature_recorder_set
+
+2014-01-02  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/be13_api/feature_recorder.h (class feature_recorder): carve no longer needs hasher passed in, becuase it is in the feature_recorder_set
+
+	* src/be13_api/bulk_extractor_i.h (be13): hash_def moved from be13 namespace to feature_recorder_set
+
+2013-12-13  Basic  <simsong@npsair.local>
+
+	* src/image_process.h (class process_dir): implemented const correctness for a whole bunch of methods
+
+	* src/be13_api/feature_recorder.h: removed using namespace std
+
+2013-12-11  Basic  <simsong@npsair.local>
+
+	* src/be13_api/feature_recorder_set.h (class feature_recorder_set): process_histograms changed to make_histograms, because that's what it is doing
+
+	* src/be13_api/feature_recorder.h (class feature_recorder): make_histogram renamed to dump_histogram (because that's what it's doing; callback function added)
+
+2013-11-13  Basic  <simsong@Mucha.local>
+
+	* src/be13_api: USE_HISTOGRAMS is gone; everybody uses them now.
+
+	* src/main.cpp (main): alert_list and stop_list are no longer global variables; they are now local to main() and added to the feature_recorder_set
+
+	* src/be13_api/feature_recorder_set.cpp (feature_recorder_set::init): stop_list and alert_list are now part of the feature_recorder_set.
+
+2013-11-11  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/Makefile.defs: moved word_and_context_list.* from bulk_extractor to be13_api
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::feature_recorder): now has reference to feature_recorder_set
+
+	* src/stand.cpp (main): replaced manual histogram generator in stand with call to phase_histogram in be13::plugin
+
+2013-11-08  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/bulk_extractor_i.h (be13): added proper #ifdefs for each type
+
+2013-11-05  Basic  <simsong@mucha.local.tld>
+
+	* src/be13_api/feature_recorder_set.h (class feature_recorder_set): more functions were made virtual and more instance values were made private
+
+2013-10-26  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/bulk_extractor_i.h: process_packet_info renamed to process_packet.
+
+	* src/be13_api/sbuf.h (class sbuf_t): removed pos0_t from map_file because it can be inferred.
+
+2013-09-27  Basic  <simsong@ncr.nps.edu>
+
+	* python/bulk_extractor_reader.py (BulkReport): changed .imagefile() to .image_filename
+
+	* python/identify_filenames.py: changed .imagefile to .image_filename
+2013-10-22  Basic  <simsong@Mucha.local>
+
+	* configure.ac: updated for C++ and MacOS Mavericks. Changed version to 1.4.2
+
+2013-10-15  Basic  <simsong@Mucha.local>
+
+	* src/main.cpp (main): removed BULK_EXTRACTOR_DEBUG.
+
+2013-10-08  Basic  <simsong@npsair.local>
+
+	* src/scan_net.cpp (p): removed packetset (no longer used)
+
+	* src/be13_api/sbuf.h (stoi64): stoi() removed because it is part of stdc11
+
+2013-10-08  Simson Garfinkel  <simsong@npsair.local>
+
+	* src/be13_api/feature_recorder.h (f): removed tags
+
+2013-10-07  Basic  <simsong@arlington-38-68-232-163.ncr.vt.edu>
+
+	* src/be13_api/plugin.cpp (plugin::phase_histogram): cleaned up printing of newlines during histogram output printing.
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::write): replace substr with in-place resize
+
+2013-10-07  Basic  <simsong@npsair.local>
+
+	* src/be13_api/feature_recorder.h (class feature_recorder): added MAINTHREAD() to set_flag(), becuase flags should only be set in the main thread. Also moved definition into feature_recorder.cpp, so that the in-memory histogram can be created if that flag is set.
+
+2013-09-25  Basic  <simsong@Mucha.local>
+
+	* src/bulk_extractor.cpp (main): added reporting of MD5 of disk image
+
+2013-09-18  Simson Garfinkel  <simsong@npsair.local>
+
+	* src/be13_api/feature_recorder.cpp (carve): valid_dosname has to be applied to ext, since ext may come with slashes in it.
+
+2013-09-17  Simson Garfinkel  <simsong@npsair.local>
+
+	* src/scan_bulk.cpp (dfrws2012_bulk_process_dump): removed DFRWS code.
+
+2013-09-16  Simson Garfinkel  <simsong@npsair.local>
+
+	* configure.ac: incremented version to 1.4.1-dev. Enabled LT_INIT support; removed RANLIB support.
+
+2013-08-20  Basic  <simsong@Mucha.local>
+
+	* src/scan_accts.flex (dob): DOBs, Fedex#s, and SSNs are now recorded to a feature recorder called 'pii.txt'.
+
+2013-08-20  Man Page  <simsong@mncrnpsedu.local>
+
+	* configure.ac: updated to beta6
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::write_tag): disabled recorders no longer carve or have tag support.
+
+2013-08-18  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/be13_api/feature_recorder_set.cpp (feature_recorder_set::create_name): added warning if feature recorder already exists.
+
+	* src/bulk_extractor.cpp (main): removed explicit creation of alert recorder; no longer needed.
+
+	* src/be13_api/feature_recorder_set.h (class feature_recorder_set): alert_recorder should not be a global static; it is now per feature_recorder_set.
+
+2013-08-02  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::feature_recorder): removed carved_set that was keeping track of what was carved, as it is no longer necessary.
+
+2013-08-01  Basic  <simsong@ncr.nps.edu>
+
+	* src/scan_exif.cpp (scan_exif): jpeg carver feature recorder renamed to jpeg_carved.
+
+2013-07-30  Basic  <simsong@ncr.nps.edu>
+
+	* src/be13_api/plugin.cpp (info_scanners): now only prints -H info if it is provided by the scanner.
+2013-07-29  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/scan_zip.cpp (scan_zip_component): now records general_purpose_bit_flags in XML. Bit 1 indicates that a component is encrypted
+	(scan_zip_component): removed max_depth check; it's in plugin system
+
+2013-07-26  Simson Garfinkel  <simsong@Mucha.local>
+
+	* src/scan_net.cpp (scan_net): the -S variable carve_tcp is now implemented by the scan_net scanner to enable or disable TCP/IP memory structure carving. It is disabled by default.
+
+2013-07-17  Basic  <simsong@sg1.ncr.nps.edu>
+
+	* src/scan_windirs.cpp (scan_windirs): windirs now only runs at top level
+
+	* src/scan_zip.cpp (scan_zip_component): now prints mtime in ISO8601 format
+	(scan_zip_component): (previously mtime and ctime were wrong parts)
+
+2013-07-16  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/scan_xor.cpp (scan_xor): will not XOR on either side of a ZIP. improved error handling
+
+	* tests/regress.py: updated numbers for 1.4 release
+
+2013-07-14  Basic  <simsong@Mucha.local>
+
+	* configure.ac: updated to beta4
+
+2013-07-11  Basic  <simsong@Mucha.local>
+
+	* configure.ac: updated to beta3
+
+	* src/scan_exif.cpp: fixed jpeg validation. carving now works.
+
+2013-07-09  Simson Garfinkel  <simsong@sg1.ncr.nps.edu>
+
+	* src/be13_api/plugin.cpp (GET_CONFIG): fixed bug in handling of uint8_t config values. They weren't getting set properly.. Ugh.
+
+	* src/scan_xor.cpp (scan_xor): fixed error when XOR mask was specified as 0. Previously it recused; now it does not.
+
+2013-07-02  Simson Garfinkel  <simsong@Mucha.local>
+
+	* configure.ac: removed defines we aren't using anymore
+
+2013-06-27  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/feature_recorder.h (class feature_recorder): as a result of popular demand, the UTF8 BOM and BOM EXPLAINATION have been removed from the feature files
+
+2013-06-26  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/feature_recorder_set.cpp (feature_recorder_set::get_name): get_name() now returns NULL if feature recorder does not exist.
+
+	* src/be13_api/feature_recorder.h (class feature_recorder): added context_window_before() and context_window_after().
+
+	* src/bulk_extractor.cpp (main): replaced context_window with context_window_default.
+
+2013-06-21  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/be13_api/bulk_extractor_i.h (class scanner_params): made more variables const.
+	(class recursion_control_block): removed returnAfterFound(raf); now implemented with exceptions
+
+2013-06-19  Basic  <simsong@Mucha.local>
+
+	* src/bulk_extractor.cpp (]): fixed handling of LIB_EXPAT
+	(b): restart logic did not compile. Now it is fixed.
+
+	* configure.ac: fixed bug in which expat.h was not being checked for. use AC_CHECK_HEADERS() instead of AC_CHECK_HEADER(), as AC_CHECK_HEADER() requires that you add additional logic and AC_CHECK_HEADERS() automatically adds HAVE_HEADER_H.
+
+2013-06-18  Basic  <simsong@Mucha.local>
+
+	* src/scan_zip.cpp (scan_zip): removed name_len (not needed)
+
+2013-06-17  Basic  <simsong@mucha.lan>
+
+	* src/pyxpress.h: removed 'extern' designation
+
+	* src/image_process.h (i): removed extern size_t opt_pagesize and extern size_t opt_margin. These are now phase1 configuration variables that are passed into the image_iterator.
+
+2013-06-15  Basic  <simsong@Mucha.local>
+
+	* src/scan_email.flex (Host): removed ip_written and ip_tested (always remove dead code)
+
+2013-06-08  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::carve): changed carving so that carved files are stored with the filename of their location. Also, fixed check-then-access race error in feature_record.cpp
+	(feature_recorder::carve): fixed race conditon in carving.
+
+2013-05-28  Basic  <simsong@ncr.nps.edu>
+
+	* feature_recorder_set.cpp - debug is now a static variable
+
+	* src/image_process.h (image_process): debug is now a local variable for image_process.h
+
+2013-05-22  Man Page  <simsong@mncrnpsedu.local>
+
+	* src/be13_api/bulk_extractor_i.h (DEBUG_EXIT_EARLY): removed DEBUG_MALLOC and DEBUG_MALLOC_FAIL_FREQUENCY; now is handled with -S system
+
+	* src/bulk_extractor.h: removed all global options; replaced with the be config system
+
+	* src/pyxpress.c: added OpenSSL exemption per email from Matthieu Suiche
+
+	* src/be13_api/sbuf.h: md5 support removed from sbuf
+
+2013-05-21  Basic  <simsong@public-172-21-213-43.near.uiuc.edu>
+
+	* src/be13_api/plugin.cpp (plugin::get_scanner_feature_file_names): extensive changes to make the global functions part of the be13::plugin class.
+
+2013-05-20  Basic  <simsong@npsair.local>
+
+	* src/bulk_extractor.cpp (main): -S now sets options; -s now sets sampling fraction.
+
+2013-05-13  Simson Garfinkel  <simsong@Mucha.local>
+
+	* src/bulk_extractor.cpp (usage): The -B option for specifying the blocksize for bulk data analysis has been removed. Instead specify it with -S block_size=NN.
+
+	* src/be13_api/xml.cpp (xml::xml): Routine for opening an existing DFXML file is removed. Anyone who processes XML with regular expressions is in a state of sin.
+
+2013-05-12  Basic  <simsong@Mucha.local>
+
+	* src/be13_api/plugin.cpp: max_depth changed to 7
+2013-05-11    <simsong@ncr.nps.edu>
+
+	* src/scan_winpe.cpp (scan_winpe_verify): added verification of section names and DLL names to reject false positives. 
+
+2013-05-09    <simsong@ncr.nps.edu>
+
+	* src/scan_net.cpp (p): carved ethernet packets are now properly recorded in ether.txt and tcp.txt
+
+	* packet carving for disembodied ethernet packets fixed!  In 3ad21780, simsong was creating the hz structure but not setting it, so all carved packets had zero length
+
+2013-05-08    <simsong@ncr.nps.edu>
+
+	* src/be13_api/feature_recorder.cpp (banner_stamp): added \n to # BANNER FILE NOT PROVIDED
+
+	* src/scan_elf.cpp (scan_elf_verify): fixed bug in scan_elf where XML was incorrect and being generated for invalid ELF headers.
+
+2013-03-23  Simson Garfinkel  <simsong@Mucha.local>
+
+	* src/bulk_extractor.cpp (main): -Z is no longer fatal if directory does not exist.
+2013-03-23  Simson Garfinkel  <simsong@r2.ncr.nps.edu>
+
+	* configure.ac: fixed AX_PTHREAD test to fail if pthreads are not found.
+
+2013-03-22    <simsong@ncr.nps.edu>
+
+	* src/be13_api/feature_recorder_set.cpp (get_name): renamed Mstats to Mlock. Added Mlock to get_name() (apparently this isn't thread safe?)
+
+2013-01-29  Simson Garfinkel  <simsong@Mucha.local>
+
+	* src/threadpool.h (class worker): removed pesky noreturn problem with threadpool.
+
+2012-12-25  Simson Garfinkel  <simsong@Mucha.local>
+
+	* python/identify_filenames.py (process_featurefile): added #'s to report printed at bottom
+	(process_featurefile): added format
+
+	* python/bulk_extractor_reader.py (is_feature_line): Now handles annotated feature files.
+	(BulkReport.__init__.validate): added programmer notice for error of providing a feature file instead of a report directory
+
+2012-11-25  Simson Garfinkel  <simsong@mncrnpsedu.local>
+
+	* src/be13_api/feature_recorder.cpp (feature_recorder::carve): fixed bad mode on mkdir
+
+2012-11-22  Simson Garfinkel  <simsong@Mucha.local>
+
+	* src/scan_aes.cpp (rotate): changed implementation to avoid casting error.
+
+	* src/be13_api/bulk_extractor_i.h (class scanner_def): const scanner_t *changed to scanner_t for compliance with clang.
+
+	* src/be13_api/sbuf.h (class sbuf_t): changed cast for clang
+
+2012-11-21  Simson Garfinkel  <simsong@ubuntu>
+
+	* src/utils.h: moved ishexnumber from bulk_extractor.h to utils.h
+
+2012-11-14  Simson Garfinkel  <simsong@npsair.local>
+
+	* src/plugin.cpp (process_sbuf): renamed process_extract to process_sbuf and put it here.
+
+	* src/bulk_extractor.h: removed lowerstr() as it wasn't being used.
+
+	* src/word_and_context_list.h: replaced multimap with tr1/unordered_map
+
+2012-11-06  Simson Garfinkel  <simsong@mncrnpsedu.local>
+
+	* src/scan_email.flex (Host): maximum URL size increased to 384 bytes
+
+2012-11-05  Simson Garfinkel  <simsong@npsair.local>
+
+	* src/be13_api/feature_recorder_set.h (class feature_recorder_set): changed constructor so that ALERT_RECORDER is now created in bulk_extractor.cpp and not in the constructor. This improves code reuse in other programs
+
+	* src/feature_recorder_set.cpp (feature_recorder_set::get_alert_recorder): changed ALERT_RECORDER to ALERT_RECORDER_NAME. 
+
+2012-10-27  Simson Garfinkel  <simsong@npsair.local>
+
+	* src/sbuf_private.h (sbuf_t::get16i): fixed get16i return error.
+
+2012-10-29  Simson Garfinkel  <simsong@air2.local>
+
+	* src/Makefile.am: updated for be13_api directory
+
+2012-10-22  Simson Garfinkel  <simsong@air2.local>
+
+	* src/sbuf_private.h (sbuf_t::get16u): fixed typo in get16u().
+
+2012-10-14  user  <user@localhost.localdomain>
+
+	* src_win/Makefile.am (EXTRA_DIST): folded CONFIGURE_LIBRARIES into CONFIGURE_FC17.sh. Modified script so that tre gets built static under windows.
+
+2012-10-09  Simson Garfinkel  <simsong@air2.local>
+
+	* Makefile.am (release): removed AM_CFLAGS   = -Wall; AM_CPPFLAGS = -Wall ; AM_CXXFLAGS = -Wall as they didn't do anything
+
+
+
+2012-09-29  Simson Garfinkel  <simsong@air2.local>
+
+	* java_gui/BEViewer: added #!/bin/sh 
+
 2012-09-20  Simson Garfinkel  <simsong@air2.local>
+
+	* configure.ac: version 1.3
 
 	* src/xml.cpp (xml::add_DFXML_build_environment): now checks for TRE version
 
@@ -163,7 +557,6 @@
 	* src/utils.c (gmtime_r): moved to utils.c
 	(localtime_r): moved to utils.c
 
->>>>>>> .r10097
 2012-07-07  Simson Garfinkel  <simsong@mncrnpsedu.local>
 
 	* src/scan_windirs.cpp (scan_ntfsdirs): scan_windirs now prints $NOFILENAME for no file name
@@ -1480,7 +1873,7 @@
 	* src/scan_accts.flex: fixed regular expression scan_accts.flex:REGEX7 to allow:
 	  - no space between (800)555-1212
 	  - periods to terminate (800)555-1212.
-	
+
 
 2010-06-03  Simson Garfinkel  <simsong@m.ern.nps.edu>
 

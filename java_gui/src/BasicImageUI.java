@@ -100,24 +100,24 @@ public class BasicImageUI extends ImageUI implements MouseListener, MouseMotionL
     return new Font("monospaced", Font.PLAIN, imageView.getFontSize());
   }
 
-  private void scrollToFeatureLine() {
+  // scroll to path else scroll to top
+  private void scrollToForensicPath() {
     Rectangle rectangle;
 
-    // get the feature line index
-    FeatureLine featureLine = (imageView.getImagePage() == null) ?
-              null : imageView.getImagePage().featureLine;
-    final int featureLineIndex = imageView.getFeatureLineIndex(featureLine);
+    // get the forensic path line index
+    final int forensicPathLineIndex = imageView.getForensicPathLineIndex(imageView.getImagePage().featureLine.forensicPath);
 
     // scroll based on index
-    if (featureLineIndex == -1) {
+    if (forensicPathLineIndex == -1) {
 
-      // the highlight address is not in this page, so scroll to top
+      // the forensic path to be scrolled to is not in this page,
+      // so scroll to top
       rectangle = new Rectangle(0, 0, 0, 0);
 
     } else {
-      // the feature line address is in this page, so scroll to it
+      // the forensic path is in this page, so scroll to it
       // calculate the line's pixel address based on font height
-      int y = featureLineIndex * fontHeight;
+      int y = forensicPathLineIndex * fontHeight;
 
       // scroll to the pixel address allowing a rectangular margin of three lines below
       rectangle = new Rectangle(0, y, 0, fontHeight * 3);
@@ -227,6 +227,10 @@ public class BasicImageUI extends ImageUI implements MouseListener, MouseMotionL
    */
   public void mouseClicked(MouseEvent e) {
 //WLog.log("BasicImageUI.MouseClicked");
+    // for mouse click deselect range if range is selected
+    if (rangeSelectionManager.getProvider() == imageView) {
+      rangeSelectionManager.clear();
+    }
   }
   /**
    * Not used.
@@ -348,16 +352,16 @@ public class BasicImageUI extends ImageUI implements MouseListener, MouseMotionL
         }
 
         // scroll to the feature line else scroll to top
-        scrollToFeatureLine();
+        scrollToForensicPath();
 
-        // NOTE: scrollToFeatureLine does not issue repaint if the scroll doesn't change
+        // NOTE: scrollToForensicPath does not issue repaint if the scroll doesn't change
         // so we must repaint wheather scrollpane did so or not.
         imageComponent.repaint();
 
       } else if (changeType == ImageView.ChangeType.USER_HIGHLIGHT_CHANGED) {
         // although highlighting changed, geometry did not change.
         imageComponent.repaint();
-      } else if (changeType == ImageView.ChangeType.ADDRESS_FORMAT_CHANGED
+      } else if (changeType == ImageView.ChangeType.FORENSIC_PATH_NUMERIC_BASE_CHANGED
               || changeType == ImageView.ChangeType.FONT_SIZE_CHANGED) {
         // line text changed but the addressing to the lines remains the same
         imageComponent.setComponentSize(getViewDimension());

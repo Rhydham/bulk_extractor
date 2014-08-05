@@ -33,23 +33,6 @@
 #include <ctype.h>
 #include <errno.h>
 
-#ifndef HAVE_ISHEXNUMBER
-int ishexnumber(int c);
-inline int ishexnumber(int c)
-{
-    switch(c){
-    case '0':         case '1':         case '2':         case '3':         case '4':
-    case '5':         case '6':         case '7':         case '8':         case '9':
-    case 'A':         case 'B':         case 'C':         case 'D':         case 'E':
-    case 'F':         case 'a':         case 'b':         case 'c':         case 'd':
-    case 'e':         case 'f':
-	return 1;
-    }
-    return 0;
-}
-#endif
-
-
 
 #ifdef HAVE_STDLIB_H
 # include <stdlib.h>
@@ -111,7 +94,7 @@ inline int ishexnumber(int c)
 # include <sys/cdefs.h>
 #endif
 
-#include <pthread.h>
+#include <pthread.h>                    // must have pthread
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
@@ -135,8 +118,6 @@ inline int ishexnumber(int c)
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
-
-#include <unistd.h>
 
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
@@ -162,57 +143,13 @@ inline int ishexnumber(int c)
 #include <sys/mman.h>
 #endif
 
-#include "utils.h"
-
-//This is now done automatically in configure.ac
-//#if (__GNUC__*1000+__GNUC_MINOR__) > 4001
-//#define GNUC_HAS_DIAGNOSTIC_PRAGMA
-//#endif
-
+#include "be13_api/utils.h"
 
 #if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 # define ATTR_FORMAT(param,arg) __attribute__ ((__printf__,param,arg))
 #else
 # define ATTR_FORMAT(spec) /* empty */
 #endif
-
-
-
-/* bulk_extractor.cpp */
-
-#define DEBUG_PEDANTIC    0x0001	// check values more rigorously
-#define DEBUG_PRINT_STEPS 0x0002
-#define DEBUG_SCANNER     0x0004	// dump all feature writes to stderr
-#define DEBUG_NO_SCANNERS 0x0008        /* do not run the scanners */
-#define DEBUG_DUMP_DATA   0x0010	/* dump data as it is seen */
-#define DEBUG_MALLOC_FAIL 0x0020
-#define DEBUG_INFO        0x0040	// print extra info
-#define DEBUG_MALLOC_FAIL_FREQUENCY 200
-#define DEBUG_EXIT_EARLY  1000		/* just print the size of the volume and exis */
-#define DEBUG_ALLOCATE_512MiB 1002	/* Allocate 512MiB, but don't set any flags */
-
-extern int debug;			// feel free to use
-extern const char *progname;
-extern size_t opt_scan_bulk_block_size;
-extern bool opt_work_start_work_end;	// note when each scanner starts and ends; needed for restarting
-
-extern int opt_quiet;			// if true, no status updates
-extern int opt_notify_rate;		/* how often through main loop to print a status line */
-extern int opt_dedup_bloom_bits;
-extern int word_min;
-extern int word_max;
-extern int min_uncompr_size;	// don't bother with objects smaller than this
-extern int max_uncompr_size;
-
-extern int64_t opt_offset_start;	// where to start analysis
-extern int64_t opt_offset_end;		// where to end analysis
-extern size_t opt_pagesize;
-extern size_t opt_margin;
-extern size_t opt_max_feature_size;
-extern size_t opt_max_context_size;
-
-extern uint32_t opt_last_year;		// assume year is less than this
-extern const char *image_fname;		// the image filename
 
 #ifdef	__cplusplus
 #include <algorithm>
@@ -226,57 +163,24 @@ extern const char *image_fname;		// the image filename
 #include <sstream>
 #include <vector>
 
-using namespace std;
+#include "be13_api/bulk_extractor_i.h"
 
-void	be_mkdir(std::string dir);
-void	validate_fn(std::string &fn);
+/* bulk_extractor.cpp */
 
-typedef std::map<std::string,std::string>  be_config_t;
-extern be_config_t be_config; // system configuration
+#include <be13_api/beregex.h>
+#include "word_and_context_list.h"
 
-#include "bulk_extractor_i.h"
+extern scanner_t *scanners_builtin[];
 
 /****************************************************************
  *** SCANNER PROCESSORS - operate on the scanners
  ****************************************************************/
-extern process_t process_extract;			/* process for feature extraction */
-extern process_t process_path_printer;			/* process for path printing  */
-
-//#ifdef _WIN32
-//#define __printflike(a,b) 		// ignore this feature in mingw
-//#endif
-
-/* support.cpp */
-
-void		truncate_at(string &line,char ch);
-std::string	ssprintf(const char *fmt,...);
-std::string	upperstr(const std::string &str);
-std::string	lowerstr(const std::string &str);
-bool		ends_with(const std::string &,const std::string &with);
-bool		ends_with(const std::wstring &,const std::wstring &with);
-
-/* C++ string splitting code from http://stackoverflow.com/questions/236129/how-to-split-a-string-in-c */
-std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems);
-std::vector<std::string> split(const std::string &s, char delim); 
 
 /****************************************************************/
 
-#include "regex.h"
-#include "word_and_context_list.h"
-
-/* The global lists for alerting and stopping */
-extern word_and_context_list alert_list;		/* should be flagged */
-extern word_and_context_list stop_list;		/* should be ignored */
-
-void set_scanner_enabled(const string name,bool enable);
-
-/* Assume the highest year */
-
-/* built-in scanners */
 
 /* flex-based scanners */
 extern "C" scanner_t scan_email;  
-//extern "C" scanner_t scan_httpheader;
 extern "C" scanner_t scan_accts;  
 extern "C" scanner_t scan_kml;
 extern "C" scanner_t scan_gps;
@@ -289,27 +193,41 @@ extern "C" scanner_t scan_base64;
 extern "C" scanner_t scan_vcard;
 extern "C" scanner_t scan_lift;
 extern "C" scanner_t scan_extx;
-/* Special support for find */
 extern "C" scanner_t scan_find;
-extern regex_list find_list;
-void add_find_pattern(const string &pat);
-void process_find_file(const char *findfile);
 
 #ifdef HAVE_EXIV2
 extern "C" scanner_t scan_exiv2;
 #endif
+#ifdef HAVE_HASHDB
+extern "C" scanner_t scan_hashdb;
+#endif
 extern "C" scanner_t scan_aes;
 extern "C" scanner_t scan_bulk;
+extern "C" scanner_t scan_sceadan;
 extern "C" scanner_t scan_elf;
 extern "C" scanner_t scan_exif;
 extern "C" scanner_t scan_gzip;
 extern "C" scanner_t scan_hiberfile;
+extern "C" scanner_t scan_httplogs;
 extern "C" scanner_t scan_json;
+#ifdef HAVE_LIBLIGHTGREP
+extern "C" scanner_t scan_accts_lg;
+extern "C" scanner_t scan_base16_lg;
+extern "C" scanner_t scan_email_lg;
+extern "C" scanner_t scan_gps_lg;
+extern "C" scanner_t scan_lightgrep;
+#endif
+extern "C" scanner_t scan_facebook;
 extern "C" scanner_t scan_pdf;
+extern "C" scanner_t scan_winlnk;
 extern "C" scanner_t scan_winpe;
 extern "C" scanner_t scan_winprefetch;
 extern "C" scanner_t scan_zip;
+extern "C" scanner_t scan_rar;
 extern "C" scanner_t scan_windirs;
+extern "C" scanner_t scan_xor;
+extern "C" scanner_t scan_outlook;
+extern "C" scanner_t scan_sqlite;
 
 #endif
 #endif
