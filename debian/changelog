@@ -4,6 +4,7 @@ bulk-extractor (1.5.1-0kali1) UNRELEASED; urgency=medium
   * New Uptream release 
   * drop 2 files in debian/docs because they don't exist anymore
   * add dh_autoreconf in rules to create ./configure
+  * Use debhelper 9 nad change url for vcs-git
 
  -- Sophie Brun <sophie@freexian.com>  Tue, 05 Aug 2014 09:48:08 +0200
 
