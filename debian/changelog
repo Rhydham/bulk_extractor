@@ -1,3 +1,9 @@
+bulk-extractor (1.3-1kali5.1) UNRELEASED; urgency=medium
+
+  * debian/watch updated because it didn't work.
+
+ -- Sophie Brun <sophie@freexian.com>  Tue, 05 Aug 2014 09:42:45 +0200
+
 bulk-extractor (1.3-1kali5) kali; urgency=low
 
   * Removed desktop file
