@@ -1,3 +1,9 @@
+bulk-extractor (1.5.1-0kali2) kali-dev; urgency=medium
+
+  * drop depends to libraries (already managed by shlibs:Depends)
+
+ -- Sophie Brun <sophie@freexian.com>  Wed, 06 Aug 2014 08:44:21 +0200
+
 bulk-extractor (1.5.1-0kali1) kali-dev; urgency=medium
 
   * debian/watch updated because it didn't work.
