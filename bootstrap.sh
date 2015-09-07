@@ -13,7 +13,7 @@ do
 done
 
 # have automake do an initial population if necessary
-if [ ! -e config.guess -o ! -e config.sub -o ! -e install-sh -o ! -e missing ]; then
+if [ ! -e config.guess -o ! -e config.sub -o ! -e install-sh -o ! -e missing -o ! -e test-driver ]; then
     autoheader -f
     touch NEWS README AUTHORS ChangeLog
     touch stamp-h
@@ -25,12 +25,17 @@ else
     autoreconf -f
 fi
 
-if [ `uname -s` = 'Darwin' ]; then
-  echo To enable AddressSanitizer on Mac, you must install gcc-4.8 with macports, then:
-  echo CC=gcc-mp-4.8 CXX=g++-mp-4.8  sh configure --enable-address-sanitizer
-else
-  echo To enable AddressSanitizer, install libasan and configure with:
-  echo sh configure --enable-address-sanitizer
+# We were very excited about AddressSanitizer.
+# This is how to enable it...
+ADVERTISE=no
+if [ $ADVERTISE = 'yes' ]; then
+  if [ `uname -s` = 'Darwin' ]; then
+    echo To enable AddressSanitizer on Mac, you must install gcc-4.8 with macports, then:
+    echo CC=gcc-mp-4.8 CXX=g++-mp-4.8  sh configure --enable-address-sanitizer
+  else
+    echo To enable AddressSanitizer, install libasan and configure with:
+    echo sh configure --enable-address-sanitizer
+  fi
 fi
 
 # bootstrap is complete

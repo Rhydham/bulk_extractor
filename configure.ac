@@ -7,7 +7,7 @@
 # and http://www.openismus.com/documents/linux/automake/automake.shtml
 
 AC_PREREQ(2.57)
-AC_INIT(BULK_EXTRACTOR, 1.5.3, bugs@digitalcorpora.org)
+AC_INIT(BULK_EXTRACTOR, 1.6.0-dev, bugs@digitalcorpora.org)
 
 AC_CONFIG_MACRO_DIR(m4)
 
@@ -147,7 +147,11 @@ AC_ARG_ENABLE([lightgrep],
 	      [AC_DEFINE(USE_LIGHTGREP, 1, [Use LIGHTGREP]) lightgrep="yes"],
               [])
 AM_CONDITIONAL([LIGHTGREP_ENABLED], [test "yes" = "$lightgrep"])
-
+AC_ARG_ENABLE([flexscanners],
+              AS_HELP_STRING([--disable-flexscanners], [disable FLEX-based scanners]),
+              [],
+              [AC_DEFINE(USE_FLEXSCANNERS, 1, [Use FLEX-based scanners]) flexscanners='yes'])
+AM_CONDITIONAL([FLEXSCANNERS_ENABLED], [test "yes" = "$flexscanners"])
 
 
 ################################################################
@@ -384,16 +388,6 @@ if test x"$hashdb" == x"yes" ; then
   AC_CHECK_LIB([xml2], [xmlSAXUserParseFile],[LIBS="-lxml2 $LIBS"],
     [AC_MSG_WARN([Could not find libxml2 library required to build the hashdb scanner])
     hashdb=no])
-
-  if test x"$hashdb" == xyes ; then
-    AX_BOOST_BASE([1.53],
-      [AX_BOOST_SYSTEM
-      AX_BOOST_FILESYSTEM
-      AX_BOOST_IOSTREAMS
-      LIBS="$BOOST_SYSTEM_LIB $BOOST_FILESYSTEM_LIB $BOOST_IOSTREAMS_LIB $LIBS"],
-      [AC_MSG_WARN([Boost 1.53 or newer is required to build the hashdb scanner])
-      hashdb=no])
-  fi
 
   if test x"$hashdb" == xyes ; then
     AC_LANG_PUSH(C++)
