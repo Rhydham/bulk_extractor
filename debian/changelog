@@ -1,3 +1,9 @@
+bulk-extractor (1.5.3-0kali1) kali-dev; urgency=medium
+
+  * Import new upstream release
+
+ -- Sophie Brun <sophie@freexian.com>  Mon, 07 Sep 2015 15:50:16 +0200
+
 bulk-extractor (1.5.1-0kali2) kali-dev; urgency=medium
 
   * drop depends to libraries (already managed by shlibs:Depends)
